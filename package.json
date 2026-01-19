@@ -1,0 +1,46 @@
+{
+  "name": "vibesprint",
+  "version": "0.1.0",
+  "description": "GitHub-driven local automation for issue-to-PR workflows",
+  "type": "module",
+  "author": "llamojha",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amllamojha/vibesprint.git"
+  },
+  "homepage": "https://github.com/amllamojha/vibesprint#readme",
+  "bugs": {
+    "url": "https://github.com/amllamojha/vibesprint/issues"
+  },
+  "keywords": [
+    "github",
+    "automation",
+    "cli",
+    "issue-to-pr",
+    "ai",
+    "code-generation"
+  ],
+  "bin": {
+    "vibesprint": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.0.0",
+    "@octokit/graphql": "^8.0.0",
+    "@octokit/rest": "^21.0.0",
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.17"
+  }
+}
