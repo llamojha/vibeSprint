@@ -9,7 +9,7 @@ export interface IssueContext {
   prompt: string;
 }
 
-export async function buildContext(issue: Issue): Promise<IssueContext> {
+export async function buildContext(issue: Issue, skipCuration = false): Promise<IssueContext> {
   const token = getToken();
   const gql = graphql.defaults({ headers: { authorization: `token ${token}` } });
 
@@ -29,7 +29,15 @@ export async function buildContext(issue: Issue): Promise<IssueContext> {
 
   const comments = node.comments.nodes.map(c => `@${c.author?.login ?? 'unknown'}: ${c.body}`);
 
-  const prompt = `
+  const prompt = skipCuration
+    ? buildSimplePrompt(issue, comments)
+    : buildCuratedPrompt(issue, comments);
+
+  return { issue, comments, prompt };
+}
+
+function buildSimplePrompt(issue: Issue, comments: string[]): string {
+  return `
 You are working on GitHub issue #${issue.number}: ${issue.title}
 
 ## Issue Description
@@ -48,8 +56,54 @@ After completing the implementation, output a PR description in the following fo
 <Your PR description here explaining what was done and why>
 ---PR_DESCRIPTION_END---
 `.trim();
+}
 
-  return { issue, comments, prompt };
+function buildCuratedPrompt(issue: Issue, comments: string[]): string {
+  return `
+You are working on GitHub issue #${issue.number}: ${issue.title}
+
+## Issue Description
+${issue.body || 'No description provided.'}
+
+${comments.length ? `## Recent Comments\n${comments.join('\n\n')}` : ''}
+
+## Instructions
+
+### Phase 1: Analysis & Planning
+Before writing any code, analyze the codebase and create a plan:
+
+1. **Search the codebase** to find relevant files, patterns, and existing implementations
+2. **Identify files to modify** based on the issue requirements and codebase structure
+3. **Create a plan** that includes:
+   - Files to create or modify
+   - Technical approach following existing patterns
+   - Testing requirements (unit tests, integration tests as appropriate)
+   - Acceptance criteria (what defines "done")
+   - Edge cases to handle
+
+### Phase 2: Implementation
+Execute your plan following best practices:
+
+1. **Follow existing patterns** in the codebase for consistency
+2. **Implement the changes** as planned
+3. **Add appropriate tests** to verify the implementation works
+4. **Handle edge cases** and add proper error handling
+5. **Ensure code quality** with proper validation and logging where appropriate
+
+### Phase 3: Verification
+Before finishing:
+
+1. Verify all acceptance criteria are met
+2. Ensure tests pass and cover the new functionality
+3. Save all changes
+
+## PR Description
+After completing the implementation, output a PR description in the following format:
+
+---PR_DESCRIPTION_START---
+<Your PR description here explaining what was done and why>
+---PR_DESCRIPTION_END---
+`.trim();
 }
 
 export function parsePRDescription(output: string): string | undefined {

@@ -10,6 +10,10 @@ function isPlanIssue(issue: Issue): boolean {
   return issue.labels.some(l => l.toLowerCase() === 'plan');
 }
 
+function isNoCurate(issue: Issue): boolean {
+  return issue.labels.some(l => l.toLowerCase() === 'no-curate');
+}
+
 interface RunOptions {
   dryRun?: boolean;
   interval: number;
@@ -86,8 +90,9 @@ async function processPlanIssue(config: Config, issue: Issue, runId: string, isR
 
 async function processImplementIssue(config: Config, issue: Issue, runId: string, isRetry: boolean, verbose?: boolean): Promise<void> {
   try {
-    const context = await buildContext(issue);
-    console.log('📝 Built context, invoking kiro-cli...');
+    const skipCuration = isNoCurate(issue);
+    const context = await buildContext(issue, skipCuration);
+    console.log(`📝 Built context${skipCuration ? '' : ' (curated)'}, invoking kiro-cli...`);
 
     const result = await executeKiro(context, issue.model, verbose);
 
@@ -137,7 +142,13 @@ async function processImplementIssue(config: Config, issue: Issue, runId: string
 async function processIssue(config: Config, issue: Issue, isRetry: boolean, verbose?: boolean): Promise<void> {
   const runId = randomUUID().slice(0, 8);
   const isPlan = isPlanIssue(issue);
-  console.log(`\n🚀 Processing issue #${issue.number}: ${issue.title} (run-id: ${runId}${isRetry ? ', retry' : ''}${isPlan ? ', plan' : ''})`);
+  const noCurate = isNoCurate(issue);
+  const tags = [
+    isRetry ? 'retry' : '',
+    isPlan ? 'plan' : '',
+    noCurate ? 'no-curate' : 'curate',
+  ].filter(Boolean).join(', ');
+  console.log(`\n🚀 Processing issue #${issue.number}: ${issue.title} (run-id: ${runId}, ${tags})`);
 
   if (isRetry) {
     await removeLabel(config, issue, 'retry');
@@ -185,8 +196,11 @@ export async function run(options: RunOptions): Promise<void> {
 
     if (options.dryRun) {
       issues.forEach(i => {
-        const planTag = isPlanIssue(i) ? ' [plan]' : '';
-        console.log(`  - #${i.number}: ${i.title}${planTag}`);
+        const tags = [
+          isPlanIssue(i) ? 'plan' : '',
+          isNoCurate(i) ? 'no-curate' : 'curate',
+        ].filter(Boolean).join(', ');
+        console.log(`  - #${i.number}: ${i.title} [${tags}]`);
       });
       return;
     }

@@ -4,7 +4,7 @@ import { loadConfig, getToken, type Config } from '../config.js';
 import type { IssueProvider, Issue } from './types.js';
 
 const REQUIRED_LABELS = [
-  'running', 'retry', 'failed', 'pr-opened', 'plan-posted', 'plan',
+  'running', 'retry', 'failed', 'pr-opened', 'plan-posted', 'plan', 'no-curate',
   'model:auto', 'model:claude-sonnet-4.5', 'model:claude-sonnet-4',
   'model:claude-haiku-4.5', 'model:claude-opus-4.5'
 ];
