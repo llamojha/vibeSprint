@@ -55,8 +55,12 @@ export async function createBranchAndPR(issue: Issue, prDescription?: string, cr
   git('add', '-A');
   try {
     git('commit', '-m', `feat: ${issue.title}\n\nRefs #${issue.number}`);
-  } catch {
-    // No changes to commit
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    if (errorMsg.includes('nothing to commit')) {
+      throw new Error('No changes were made by kiro-cli. Check if the issue was already resolved or needs clearer instructions.');
+    }
+    throw new Error(`Failed to commit changes: ${errorMsg}\n\nEnsure git user.name and user.email are configured:\n  git config --global user.name "Your Name"\n  git config --global user.email "your@email.com"`);
   }
 
   git('push', '-u', 'origin', branchName, '--force-with-lease');

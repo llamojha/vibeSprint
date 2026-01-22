@@ -4,7 +4,7 @@
 
 A self-hosted CLI that monitors your GitHub Project board and automatically converts issues into production-ready pull requests using `kiro-cli`. No servers, no webhooks, no complexity — just `npm install` and run.
 
-📋 **Live Project Board**: [See it in action](https://github.com/users/llamojha/projects/1) • 🎥 **Demo Video**: [Watch the workflow](https://www.youtube.com/watch?v=qomajZkC1fU)
+📋 **Live Project Board**: [See it in action](https://github.com/users/llamojha/projects/7) • 🎥 **Demo Video**: [Watch the workflow](https://www.youtube.com/watch?v=qomajZkC1fU)
 
 ## Quick Start
 
