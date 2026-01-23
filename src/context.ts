@@ -1,6 +1,5 @@
-import { graphql } from '@octokit/graphql';
-import { getToken } from './config.js';
 import { stripAnsi } from './utils.js';
+import { ghJson } from './utils/gh.js';
 import type { Issue } from './intake.js';
 import type { ExecutorType } from './executors/index.js';
 
@@ -14,25 +13,21 @@ const CODEX_SUFFIX = `
 
 IMPORTANT: Save all changes to disk. Do not ask for confirmation. Execute all file operations immediately.`;
 
+interface CommentData {
+  author: { login: string };
+  body: string;
+}
+
+function fetchComments(issueNumber: number): string[] {
+  const data = ghJson<{ comments: CommentData[] }>([
+    'issue', 'view', String(issueNumber), '--json', 'comments',
+  ]);
+  if (!data?.comments) return [];
+  return data.comments.slice(-10).map(c => `@${c.author?.login ?? 'unknown'}: ${c.body}`);
+}
+
 export async function buildContext(issue: Issue, skipCuration = false, executor: ExecutorType = 'kiro'): Promise<IssueContext> {
-  const token = getToken();
-  const gql = graphql.defaults({ headers: { authorization: `token ${token}` } });
-
-  const { node } = await gql<{
-    node: { comments: { nodes: Array<{ body: string; author: { login: string } }> } };
-  }>(`
-    query($issueId: ID!) {
-      node(id: $issueId) {
-        ... on Issue {
-          comments(last: 10) {
-            nodes { body author { login } }
-          }
-        }
-      }
-    }
-  `, { issueId: issue.id });
-
-  const comments = node.comments.nodes.map(c => `@${c.author?.login ?? 'unknown'}: ${c.body}`);
+  const comments = fetchComments(issue.number);
 
   let prompt = skipCuration
     ? buildSimplePrompt(issue, comments)
@@ -127,24 +122,7 @@ export interface PlanTask {
 }
 
 export async function buildPlanContext(issue: Issue, executor: ExecutorType = 'kiro'): Promise<IssueContext> {
-  const token = getToken();
-  const gql = graphql.defaults({ headers: { authorization: `token ${token}` } });
-
-  const { node } = await gql<{
-    node: { comments: { nodes: Array<{ body: string; author: { login: string } }> } };
-  }>(`
-    query($issueId: ID!) {
-      node(id: $issueId) {
-        ... on Issue {
-          comments(last: 10) {
-            nodes { body author { login } }
-          }
-        }
-      }
-    }
-  `, { issueId: issue.id });
-
-  const comments = node.comments.nodes.map(c => `@${c.author?.login ?? 'unknown'}: ${c.body}`);
+  const comments = fetchComments(issue.number);
 
   let prompt = `
 You are analyzing GitHub issue #${issue.number}: ${issue.title}

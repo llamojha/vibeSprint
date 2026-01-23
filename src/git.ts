@@ -1,6 +1,6 @@
-import { Octokit } from '@octokit/rest';
 import { spawnSync } from 'child_process';
-import { loadConfig, getToken } from './config.js';
+import { loadConfig } from './config.js';
+import { gh, ghJson } from './utils/gh.js';
 import type { Issue } from './intake.js';
 
 function slugify(text: string): string {
@@ -20,16 +20,16 @@ function branchExists(branchName: string): boolean {
   return result.status === 0;
 }
 
-async function findExistingPR(octokit: Octokit, owner: string, repo: string, head: string): Promise<number | null> {
-  const { data: prs } = await octokit.pulls.list({ owner, repo, head: `${owner}:${head}`, state: 'open' });
-  return prs.length > 0 ? prs[0].number : null;
+function findExistingPR(branchName: string): number | null {
+  const prs = ghJson<Array<{ number: number; headRefName: string }>>([
+    'pr', 'list', '--head', branchName, '--state', 'open', '--json', 'number,headRefName',
+  ]);
+  return prs && prs.length > 0 ? prs[0].number : null;
 }
 
 export async function createBranchAndPR(issue: Issue, prDescription?: string, credits?: number, timeSeconds?: number): Promise<string> {
-  const token = getToken();
   const config = loadConfig();
   const branchName = `agent/${issue.number}-${slugify(issue.title)}`;
-  const octokit = new Octokit({ auth: token });
 
   const defaultBranch = git('rev-parse', '--abbrev-ref', 'HEAD');
 
@@ -69,27 +69,25 @@ export async function createBranchAndPR(issue: Issue, prDescription?: string, cr
   const body = (prDescription || `## Summary\n\n${issue.body || 'Auto-generated from issue.'}\n\nFixes #${issue.number}`) + creditsLine;
 
   // Check for existing PR
-  const existingPrNumber = await findExistingPR(octokit, config.owner!, config.repo!, branchName);
+  const existingPrNumber = findExistingPR(branchName);
 
   let prUrl: string;
   if (existingPrNumber) {
-    await octokit.pulls.update({
-      owner: config.owner!,
-      repo: config.repo!,
-      pull_number: existingPrNumber,
-      body,
-    });
+    gh(['pr', 'edit', String(existingPrNumber), '--body', body]);
     prUrl = `https://github.com/${config.owner}/${config.repo}/pull/${existingPrNumber}`;
   } else {
-    const { data: pr } = await octokit.pulls.create({
-      owner: config.owner!,
-      repo: config.repo!,
-      title: issue.title,
-      body,
-      head: branchName,
-      base: defaultBranch,
-    });
-    prUrl = pr.html_url;
+    const result = ghJson<{ url: string }>([
+      'pr', 'create',
+      '--title', issue.title,
+      '--body', body,
+      '--head', branchName,
+      '--base', defaultBranch,
+      '--json', 'url',
+    ]);
+    if (!result) {
+      throw new Error('Failed to create PR');
+    }
+    prUrl = result.url;
   }
 
   git('checkout', defaultBranch);

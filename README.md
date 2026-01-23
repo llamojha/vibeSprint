@@ -11,10 +11,11 @@ A self-hosted CLI that monitors your GitHub Project board and automatically conv
 ```bash
 # 1. Install prerequisites
 # - Node.js 18+ (https://nodejs.org)
+# - GitHub CLI (https://cli.github.com)
 # - kiro-cli (https://kiro.dev/docs/cli/installation)
 
-# 2. Get GitHub token (see Setup section below)
-export GITHUB_TOKEN=github_pat_xxx
+# 2. Authenticate with GitHub CLI
+gh auth login
 
 # 3. Install VibeSprint
 git clone https://github.com/amllamojha/vibesprint.git
@@ -38,6 +39,11 @@ vibesprint run
 - Download from [nodejs.org](https://nodejs.org)
 - Verify: `node --version` (should be 18.0.0 or higher)
 
+**GitHub CLI**
+- Install from [cli.github.com](https://cli.github.com)
+- Verify: `gh --version`
+- Authenticate: `gh auth login`
+
 **Kiro CLI**
 - Install from [kiro.dev](https://kiro.dev/docs/cli/installation)
 - Verify: `kiro-cli --version`
@@ -45,62 +51,17 @@ vibesprint run
 **OpenAI Codex CLI (Optional)**
 - Install: `npm install -g @openai/codex`
 - Verify: `codex --version`
-- Requires: `OPENAI_API_KEY` environment variable
+- Authenticate: `codex login`
 
-### 2. GitHub Personal Access Token
+### 2. GitHub Authentication
 
-**Option A: Fine-grained Token (Recommended)**
+VibeSprint uses the GitHub CLI (`gh`) for all GitHub operations. Just run:
 
-1. **Go to GitHub Settings**
-   - Visit [github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta)
-   - Click "Generate new token"
-
-2. **Configure Token**
-   - **Name**: `vibesprint`
-   - **Expiration**: Choose your preference (90 days recommended)
-   - **Resource owner**: Select your username or organization
-   - **Repository access**: Select specific repositories you want to automate
-
-3. **Set Permissions**
-   - **Issues**: Read and write
-   - **Pull requests**: Read and write
-   - **Contents**: Read and write
-   - **Projects**: Read and write
-   - **Metadata**: Read (automatically selected)
-
-4. **Generate and Save**
-   - Click "Generate token"
-   - **Important**: Copy the token immediately (starts with `github_pat_`)
-   - Store it securely - you won't see it again
-
-**Option B: Classic Token (Alternative)**
-
-If fine-grained tokens don't work for your setup:
-
-1. **Go to GitHub Settings**
-   - Visit [github.com/settings/tokens](https://github.com/settings/tokens)
-   - Click "Generate new token (classic)"
-
-2. **Configure Token**
-   - **Name**: `vibesprint`
-   - **Expiration**: Choose your preference (90 days recommended)
-   - **Select scopes**:
-     - `repo` (Full control of private repositories)
-     - `project` (Full control of projects)
-
-3. **Generate and Save**
-   - Click "Generate token"
-   - Copy the token immediately (starts with `ghp_`)
-   - Store it securely
-
-**Set Environment Variable** (for either option)
 ```bash
-export GITHUB_TOKEN=github_pat_xxx  # or ghp_xxx for classic
-
-# To make it permanent, add to your shell profile:
-echo 'export GITHUB_TOKEN=github_pat_xxx' >> ~/.bashrc
-# or ~/.zshrc if using zsh
+gh auth login
 ```
+
+Follow the prompts to authenticate. That's it - no tokens to manage!
 
 ### 3. GitHub Project Board Setup
 
@@ -232,7 +193,7 @@ Parent moved to In Progress
 ```bash
 # 1. Set up in your project
 cd my-project
-export GITHUB_TOKEN=github_pat_xxx
+gh auth login  # If not already authenticated
 echo ".vibesprint" >> .gitignore
 
 # 2. Configure (first time only)
@@ -276,9 +237,9 @@ vibesprint config column
 
 | Issue | Solution |
 |-------|----------|
-| `GITHUB_TOKEN not set` | Export token: `export GITHUB_TOKEN=github_pat_xxx` |
+| `gh: command not found` | Install GitHub CLI: https://cli.github.com |
+| `gh: not logged in` | Run: `gh auth login` |
 | `Project not configured` | Run `vibesprint config link` |
-| `404 on label operations` | Ensure token has Issues: Read/Write permission |
 | `Config file lost` | Add `.vibesprint` to `.gitignore` |
 | `kiro-cli not found` | Install kiro-cli: https://kiro.dev/docs/cli/installation |
 | `codex not found` | Install: `npm install -g @openai/codex` |
