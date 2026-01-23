@@ -49,9 +49,19 @@ export async function createBranchAndPR(issue: Issue, prDescription?: string, cr
   // Always create fresh branch from main
   if (branchExists(branchName)) {
     git('checkout', defaultBranch);
-    git('branch', '-D', branchName);
+    try {
+      git('branch', '-D', branchName);
+    } catch {
+      // Branch might be in use by worktree - ignore and reuse
+    }
   }
-  git('checkout', '-b', branchName);
+  
+  try {
+    git('checkout', '-b', branchName);
+  } catch {
+    // Branch already exists (couldn't delete) - just checkout
+    git('checkout', branchName);
+  }
 
   git('add', '-A');
   try {
