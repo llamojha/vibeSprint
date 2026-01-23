@@ -1,14 +1,21 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { input, select } from '@inquirer/prompts';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { loadConfig, saveConfig, isConfigComplete, AVAILABLE_MODELS } from './config.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
+export const VERSION = pkg.version;
 
 const program = new Command();
 
 program
   .name('vibesprint')
   .description('GitHub-driven automation for issue-to-PR workflows')
-  .version('0.1.0');
+  .version(VERSION);
 
 const config = program.command('config').description('Configure VibeSprint settings');
 

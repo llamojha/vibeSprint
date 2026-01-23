@@ -1,3 +1,5 @@
+import type { ExecutorType } from '../executors/index.js';
+
 export interface Issue {
   id: string;
   number: number;
@@ -7,6 +9,7 @@ export interface Issue {
   projectItemId: string;
   labels: string[];
   model?: string;
+  executor?: ExecutorType;
 }
 
 export interface IssueProvider {

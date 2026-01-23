@@ -282,7 +282,6 @@ vibesprint config column
 | `Config file lost` | Add `.vibesprint` to `.gitignore` |
 | `kiro-cli not found` | Install kiro-cli: https://kiro.dev/docs/cli/installation |
 | `codex not found` | Install: `npm install -g @openai/codex` |
-| `OPENAI_API_KEY not set` | Export: `export OPENAI_API_KEY=sk-xxx` (required for Codex) |
 
 ## Project Structure
 

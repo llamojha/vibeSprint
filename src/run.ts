@@ -5,6 +5,7 @@ import { buildContext, buildPlanContext, parsePRDescription, parsePlanOutput } f
 import { createExecutor, type ExecutorType, type Executor } from './executors/index.js';
 import { createBranchAndPR } from './git.js';
 import { addLabel, removeLabel, moveToInReview, moveToInProgress, postErrorComment, postPlanComment, createSubIssueInBacklog, ensureLabelsExist } from './status.js';
+import { VERSION } from './cli.js';
 
 function isPlanIssue(issue: Issue): boolean {
   return issue.labels.some(l => l.toLowerCase() === 'plan');
@@ -178,18 +179,9 @@ export async function run(options: RunOptions): Promise<void> {
   }
 
   const config = loadConfig();
+  const defaultExecutorType = options.executor || config.executor || 'kiro';
   
-  // Create and validate executor
-  const executorType = options.executor || config.executor || 'kiro';
-  const executor = createExecutor(executorType);
-  const execValidation = await executor.validateSetup();
-  if (!execValidation.valid) {
-    console.error(`❌ ${executor.name} setup issues:\n`);
-    execValidation.errors.forEach(e => console.error(`  • ${e}`));
-    process.exit(1);
-  }
-
-  console.log(`🔄 VibeSprint started (executor: ${executor.name}, interval: ${options.interval}s, dry-run: ${options.dryRun ?? false})`);
+  console.log(`🔄 VibeSprint v${VERSION} started (default executor: ${defaultExecutorType}, interval: ${options.interval}s, dry-run: ${options.dryRun ?? false})`);
 
   // Check labels
   console.log('🏷️ Checking labels...');
@@ -216,6 +208,7 @@ export async function run(options: RunOptions): Promise<void> {
         const tags = [
           isPlanIssue(i) ? 'plan' : '',
           isNoCurate(i) ? 'no-curate' : 'curate',
+          i.executor ? `executor:${i.executor}` : '',
         ].filter(Boolean).join(', ');
         console.log(`  - #${i.number}: ${i.title} [${tags}]`);
       });
@@ -224,6 +217,17 @@ export async function run(options: RunOptions): Promise<void> {
 
     const issue = issues[0];
     const isRetry = issue.labels.includes('retry');
+    
+    // Use issue's executor label, fall back to default
+    const executorType = issue.executor || defaultExecutorType;
+    const executor = createExecutor(executorType);
+    const execValidation = await executor.validateSetup();
+    if (!execValidation.valid) {
+      console.error(`❌ ${executor.name} setup issues:\n`);
+      execValidation.errors.forEach(e => console.error(`  • ${e}`));
+      return;
+    }
+    
     await processIssue(config, issue, isRetry, executor, options.verbose);
     
     await poll();

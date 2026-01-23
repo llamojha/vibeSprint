@@ -119,3 +119,70 @@ Performed comprehensive hackathon submission review against official Kiro Hackat
 ### Recommendations
 - README structure improved during review process
 - Project demonstrates production-ready code quality
+
+## ticket-curation
+**Date:** 2026/1/22 14:00 - 16:30  
+**Duration:** 150 minutes  
+**Credits:** 50
+
+### Summary
+Implemented ticket curation feature that provides enhanced, structured prompts for issue processing. Added a 3-phase workflow (analyze, implement, verify) as the default behavior, with option to skip via `no-curate` label.
+
+### Changes Made
+- Added curated 3-phase prompt structure to `buildContext()`:
+  - Phase 1: Analysis & Planning (search codebase, identify files, create plan)
+  - Phase 2: Implementation (follow patterns, add tests, handle edge cases)
+  - Phase 3: Verification (check acceptance criteria, ensure tests pass)
+- Added `no-curate` label support to use simple prompt when needed
+- Updated run.ts to detect `no-curate` label and show curation status in logs
+- Created spec document at `.kiro/specs/ticket-curation/requirements.md`
+
+### Files Modified
+- `src/context.ts` - Added `buildCuratedPrompt()` and `buildSimplePrompt()` functions
+- `src/run.ts` - Added `isNoCurate()` check and curation status logging
+- `src/providers/github.ts` - Minor adjustment
+
+### Files Created
+- `.kiro/specs/ticket-curation/requirements.md` - Full spec document (480 lines)
+
+## codex-cli-integration
+**Date:** 2026/1/22 17:00 - 22:00  
+**Duration:** 300 minutes  
+**Credits:** 100
+
+### Summary
+Added OpenAI Codex CLI as an alternative code generation backend to VibeSprint. Created an Executor abstraction allowing users to choose between kiro-cli and codex based on preference.
+
+### Changes Made
+- Created `Executor` interface with `execute()`, `validateSetup()`, `getAvailableModels()` methods
+- Refactored existing kiro-cli logic into `KiroExecutor` class
+- Implemented `CodexExecutor` for OpenAI Codex CLI with `codex exec --full-auto` invocation
+- Added executor factory pattern for runtime selection
+- Extended Config schema with `executor` and `codexModel` fields
+- Added `vibesprint config executor` command for backend selection
+- Added `--executor` flag to `vibesprint run` for per-run override
+- Updated context builder with Codex-specific prompt suffix
+- Implemented token usage parsing for Codex output
+
+### Files Created
+- `src/executors/types.ts` - Executor interface, ExecutionResult, ExecutorOptions
+- `src/executors/kiro.ts` - KiroExecutor class with KIRO_MODELS
+- `src/executors/codex.ts` - CodexExecutor class with CODEX_MODELS
+- `src/executors/index.ts` - Factory function and barrel exports
+- `src/commands/executor.ts` - Config executor command
+
+### Files Modified
+- `src/config.ts` - Added executor fields, re-exported models from executors
+- `src/cli.ts` - Added executor subcommand and --executor flag
+- `src/run.ts` - Integrated executor factory
+- `src/context.ts` - Added executor parameter with Codex suffix
+- `README.md` - Added Codex documentation
+
+### Files Removed
+- `src/executor.ts` - Replaced by executors module
+
+### Codex Models Supported
+- gpt-5.2-codex (default)
+- gpt-5.2
+- gpt-5.1-codex-max
+- gpt-5.1-codex-mini

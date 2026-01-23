@@ -2,11 +2,14 @@ import { Octokit } from '@octokit/rest';
 import { graphql } from '@octokit/graphql';
 import { loadConfig, getToken, type Config } from '../config.js';
 import type { IssueProvider, Issue } from './types.js';
+import type { ExecutorType } from '../executors/index.js';
 
 const REQUIRED_LABELS = [
   'running', 'retry', 'failed', 'pr-opened', 'plan-posted', 'plan', 'no-curate',
   'model:auto', 'model:claude-sonnet-4.5', 'model:claude-sonnet-4',
-  'model:claude-haiku-4.5', 'model:claude-opus-4.5'
+  'model:claude-haiku-4.5', 'model:claude-opus-4.5',
+  'model:gpt-5.2-codex', 'model:gpt-5.2', 'model:gpt-5.1-codex-max', 'model:gpt-5.1-codex-mini',
+  'executor:kiro', 'executor:codex',
 ];
 
 export class GitHubProvider implements IssueProvider {
@@ -83,6 +86,7 @@ export class GitHubProvider implements IssueProvider {
       .map(item => {
         const labels = item.content!.labels.nodes.map(l => l.name);
         const modelLabel = labels.find(l => l.startsWith('model:'));
+        const executorLabel = labels.find(l => l.startsWith('executor:'));
         return {
           id: item.content!.id,
           number: item.content!.number,
@@ -92,6 +96,7 @@ export class GitHubProvider implements IssueProvider {
           projectItemId: item.id,
           labels,
           model: modelLabel?.replace('model:', ''),
+          executor: executorLabel?.replace('executor:', '') as ExecutorType | undefined,
         };
       })
       .sort((a, b) => a.number - b.number);

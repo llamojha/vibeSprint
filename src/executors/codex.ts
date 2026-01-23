@@ -37,10 +37,6 @@ export class CodexExecutor implements Executor {
       errors.push('Codex CLI not installed. Run: npm install -g @openai/codex');
     }
     
-    if (!process.env.OPENAI_API_KEY) {
-      errors.push('OPENAI_API_KEY environment variable not set');
-    }
-    
     return { valid: errors.length === 0, errors };
   }
 
