@@ -4,6 +4,13 @@ inclusion: always
 
 # Workflow Conventions: VibeSprint
 
+## Versioning
+
+**MANDATORY**: Bump `version` in `package.json` for EVERY code change before committing. Use semantic versioning:
+- Patch (0.0.X) - Bug fixes, small changes
+- Minor (0.X.0) - New features
+- Major (X.0.0) - Breaking changes
+
 ## Label Taxonomy
 
 ### Type Labels

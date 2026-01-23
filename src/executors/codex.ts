@@ -41,10 +41,11 @@ export class CodexExecutor implements Executor {
   }
 
   async execute(context: IssueContext, options?: ExecutorOptions): Promise<ExecutionResult> {
-    const args = ['exec', '--sandbox', 'danger-full-access', '--ask-for-approval', 'never'];
+    const args = ['--ask-for-approval', 'never'];
     if (options?.model) {
       args.push('-m', options.model);
     }
+    args.push('exec', '--sandbox', 'danger-full-access');
 
     if (options?.verbose) {
       console.log(`🔧 Running: codex ${args.join(' ')}`);
