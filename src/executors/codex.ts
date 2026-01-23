@@ -41,8 +41,10 @@ export class CodexExecutor implements Executor {
   }
 
   async execute(context: IssueContext, options?: ExecutorOptions): Promise<ExecutionResult> {
-    const model = options?.model || 'gpt-5.2-codex';
-    const args = ['exec', '--full-auto', '-m', model];
+    const args = ['exec', '--sandbox', 'danger-full-access', '--ask-for-approval', 'never'];
+    if (options?.model) {
+      args.push('-m', options.model);
+    }
 
     if (options?.verbose) {
       console.log(`🔧 Running: codex ${args.join(' ')}`);
