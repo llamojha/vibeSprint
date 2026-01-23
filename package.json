@@ -1,6 +1,6 @@
 {
   "name": "vibesprint",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "GitHub-driven local automation for issue-to-PR workflows",
   "type": "module",
   "author": "llamojha",

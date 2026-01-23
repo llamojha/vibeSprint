@@ -19,10 +19,9 @@ interface ProjectItem {
     title: string;
     body: string;
     url: string;
-    state: string;
-    labels: string[];
   };
   status: string;
+  labels?: string[];
 }
 
 export class GitHubProvider implements IssueProvider {
@@ -54,15 +53,14 @@ export class GitHubProvider implements IssueProvider {
     return items
       .filter(item => {
         if (!item.content || item.content.type !== 'Issue') return false;
-        if (item.content.state !== 'OPEN') return false;
         if (item.status !== this.config.columnName) return false;
-        const labels = item.content.labels || [];
+        const labels = item.labels || [];
         if (labels.includes('running') || labels.includes('done')) return false;
         if (labels.includes('failed') && !labels.includes('retry')) return false;
         return true;
       })
       .map(item => {
-        const labels = item.content.labels || [];
+        const labels = item.labels || [];
         const modelLabel = labels.find(l => l.startsWith('model:'));
         const executorLabel = labels.find(l => l.startsWith('executor:'));
         return {
