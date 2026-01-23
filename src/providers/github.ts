@@ -38,15 +38,18 @@ export class GitHubProvider implements IssueProvider {
       process.exit(1);
     }
 
-    const items = ghProjectJson<ProjectItem[]>([
+    const result = ghProjectJson<{ items: ProjectItem[] } | ProjectItem[]>([
       'item-list', String(this.config.projectNumber),
       '--format', 'json',
     ]);
 
-    if (!items) {
+    if (!result) {
       console.error('Error: Failed to fetch project items');
       return [];
     }
+
+    // Handle both { items: [...] } and direct array formats
+    const items = Array.isArray(result) ? result : result.items || [];
 
     return items
       .filter(item => {
@@ -156,13 +159,14 @@ export class GitHubProvider implements IssueProvider {
   }
 
   async ensureLabelsExist(): Promise<void> {
-    const existing = ghJson<Array<{ name: string }>>(['label', 'list', '--json', 'name']);
-    const existingNames = new Set(existing?.map(l => l.name) || []);
+    const result = ghJson<Array<{ name: string }> | { labels: Array<{ name: string }> }>(['label', 'list', '--json', 'name']);
+    const labels = Array.isArray(result) ? result : result?.labels || [];
+    const existingNames = new Set(labels.map(l => l.name));
 
     for (const label of REQUIRED_LABELS) {
       if (!existingNames.has(label)) {
-        const result = gh(['label', 'create', label, '--color', 'ededed']);
-        if (result.success) {
+        const createResult = gh(['label', 'create', label, '--color', 'ededed']);
+        if (createResult.success) {
           console.log(`  📌 Created label: ${label}`);
         }
       }

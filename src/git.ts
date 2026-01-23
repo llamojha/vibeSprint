@@ -21,10 +21,11 @@ function branchExists(branchName: string): boolean {
 }
 
 function findExistingPR(branchName: string): number | null {
-  const prs = ghJson<Array<{ number: number; headRefName: string }>>([
+  const result = ghJson<Array<{ number: number; headRefName: string }> | { pullRequests: Array<{ number: number }> }>([
     'pr', 'list', '--head', branchName, '--state', 'open', '--json', 'number,headRefName',
   ]);
-  return prs && prs.length > 0 ? prs[0].number : null;
+  const prs = Array.isArray(result) ? result : result?.pullRequests || [];
+  return prs.length > 0 ? prs[0].number : null;
 }
 
 export async function createBranchAndPR(issue: Issue, prDescription?: string, credits?: number, timeSeconds?: number): Promise<string> {
