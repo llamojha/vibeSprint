@@ -2,7 +2,7 @@
 
 > **Turn GitHub issues into pull requests automatically** — Just add an issue to your "Ready" column and watch VibeSprint generate, commit, and open a PR for you.
 
-A self-hosted CLI that monitors your GitHub Project board and automatically converts issues into production-ready pull requests using `kiro-cli`. No servers, no webhooks, no complexity — just `npm install` and run.
+A self-hosted CLI that monitors your GitHub Project board and automatically converts issues into production-ready pull requests using `kiro-cli` or OpenAI's `codex` CLI. No servers, no webhooks, no complexity — just `npm install` and run.
 
 📋 **Live Project Board**: [See it in action](https://github.com/users/llamojha/projects/7) • 🎥 **Demo Video**: [Watch the workflow](https://www.youtube.com/watch?v=qomajZkC1fU)
 
@@ -41,6 +41,11 @@ vibesprint run
 **Kiro CLI**
 - Install from [kiro.dev](https://kiro.dev/docs/cli/installation)
 - Verify: `kiro-cli --version`
+
+**OpenAI Codex CLI (Optional)**
+- Install: `npm install -g @openai/codex`
+- Verify: `codex --version`
+- Requires: `OPENAI_API_KEY` environment variable
 
 ### 2. GitHub Personal Access Token
 
@@ -184,6 +189,9 @@ vibesprint run --interval 30
 
 # Verbose mode (show kiro-cli commands)
 vibesprint run --verbose
+
+# Use Codex CLI instead of Kiro
+vibesprint run --executor codex
 ```
 
 Press `Ctrl+C` to stop.
@@ -194,12 +202,14 @@ Press `Ctrl+C` to stop.
 |---------|-------------|
 | `vibesprint config link` | Link to a GitHub Project |
 | `vibesprint config column` | Select columns to use |
+| `vibesprint config executor` | Select code generation backend (kiro or codex) |
 | `vibesprint config show` | Show current configuration |
 | `vibesprint config reset` | Reset configuration |
 | `vibesprint run` | Start polling and processing |
 | `vibesprint run --dry-run` | Show issues without processing |
 | `vibesprint run --interval <s>` | Set polling interval (default: 60s) |
 | `vibesprint run --verbose` | Show detailed output |
+| `vibesprint run --executor <type>` | Override executor (kiro or codex) |
 
 ## Workflows
 
@@ -271,6 +281,8 @@ vibesprint config column
 | `404 on label operations` | Ensure token has Issues: Read/Write permission |
 | `Config file lost` | Add `.vibesprint` to `.gitignore` |
 | `kiro-cli not found` | Install kiro-cli: https://kiro.dev/docs/cli/installation |
+| `codex not found` | Install: `npm install -g @openai/codex` |
+| `OPENAI_API_KEY not set` | Export: `export OPENAI_API_KEY=sk-xxx` (required for Codex) |
 
 ## Project Structure
 
@@ -279,15 +291,20 @@ src/
 ├── cli.ts           # CLI entry point
 ├── config.ts        # Configuration management
 ├── context.ts       # Build prompts for kiro-cli
-├── executor.ts      # Invoke kiro-cli
 ├── git.ts           # Git operations (branch, commit, PR)
 ├── intake.ts        # Fetch issues from project board
 ├── run.ts           # Main polling loop
 ├── status.ts        # Labels, comments, column updates
 ├── utils.ts         # Utilities (ANSI stripping)
-└── commands/
-    ├── link.ts      # Project linking
-    └── column.ts    # Column selection
+├── commands/
+│   ├── link.ts      # Project linking
+│   ├── column.ts    # Column selection
+│   └── executor.ts  # Executor selection
+└── executors/
+    ├── types.ts     # Executor interface
+    ├── kiro.ts      # Kiro CLI executor
+    ├── codex.ts     # OpenAI Codex executor
+    └── index.ts     # Factory and exports
 ```
 
 ## License

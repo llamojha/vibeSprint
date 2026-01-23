@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import type { ExecutorType } from './executors/index.js';
 
 export interface Config {
   token?: string;
@@ -16,15 +17,11 @@ export interface Config {
   interval?: number;
   model?: string;
   provider?: 'github';
+  executor?: ExecutorType;
+  codexModel?: string;
 }
 
-export const AVAILABLE_MODELS = [
-  { value: 'auto', name: 'Auto | 1x credit | Models chosen by task for optimal usage' },
-  { value: 'claude-sonnet-4.5', name: 'claude-sonnet-4.5 | 1.3x credit | The latest Claude Sonnet model' },
-  { value: 'claude-sonnet-4', name: 'claude-sonnet-4 | 1.3x credit | Hybrid reasoning and coding' },
-  { value: 'claude-haiku-4.5', name: 'claude-haiku-4.5 | 0.4x credit | The latest Claude Haiku model' },
-  { value: 'claude-opus-4.5', name: 'claude-opus-4.5 | 2.2x credit | The latest Claude Opus model' },
-] as const;
+export { KIRO_MODELS as AVAILABLE_MODELS, CODEX_MODELS } from './executors/index.js';
 
 const CONFIG_FILE = '.vibesprint';
 const CONFIG_PATH = join(process.cwd(), CONFIG_FILE);

@@ -2,6 +2,7 @@ import { graphql } from '@octokit/graphql';
 import { getToken } from './config.js';
 import { stripAnsi } from './utils.js';
 import type { Issue } from './intake.js';
+import type { ExecutorType } from './executors/index.js';
 
 export interface IssueContext {
   issue: Issue;
@@ -9,7 +10,11 @@ export interface IssueContext {
   prompt: string;
 }
 
-export async function buildContext(issue: Issue, skipCuration = false): Promise<IssueContext> {
+const CODEX_SUFFIX = `
+
+IMPORTANT: Save all changes to disk. Do not ask for confirmation. Execute all file operations immediately.`;
+
+export async function buildContext(issue: Issue, skipCuration = false, executor: ExecutorType = 'kiro'): Promise<IssueContext> {
   const token = getToken();
   const gql = graphql.defaults({ headers: { authorization: `token ${token}` } });
 
@@ -29,9 +34,13 @@ export async function buildContext(issue: Issue, skipCuration = false): Promise<
 
   const comments = node.comments.nodes.map(c => `@${c.author?.login ?? 'unknown'}: ${c.body}`);
 
-  const prompt = skipCuration
+  let prompt = skipCuration
     ? buildSimplePrompt(issue, comments)
     : buildCuratedPrompt(issue, comments);
+
+  if (executor === 'codex') {
+    prompt += CODEX_SUFFIX;
+  }
 
   return { issue, comments, prompt };
 }
@@ -117,7 +126,7 @@ export interface PlanTask {
   body: string;
 }
 
-export async function buildPlanContext(issue: Issue): Promise<IssueContext> {
+export async function buildPlanContext(issue: Issue, executor: ExecutorType = 'kiro'): Promise<IssueContext> {
   const token = getToken();
   const gql = graphql.defaults({ headers: { authorization: `token ${token}` } });
 
@@ -137,7 +146,7 @@ export async function buildPlanContext(issue: Issue): Promise<IssueContext> {
 
   const comments = node.comments.nodes.map(c => `@${c.author?.login ?? 'unknown'}: ${c.body}`);
 
-  const prompt = `
+  let prompt = `
 You are analyzing GitHub issue #${issue.number}: ${issue.title}
 
 ## Issue Description
@@ -184,6 +193,10 @@ Output your plan in the following format:
 
 Keep tasks focused and actionable. Include 2-6 tasks depending on complexity.
 `.trim();
+
+  if (executor === 'codex') {
+    prompt += CODEX_SUFFIX;
+  }
 
   return { issue, comments, prompt };
 }

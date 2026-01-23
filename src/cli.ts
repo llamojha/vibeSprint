@@ -29,6 +29,14 @@ config
   });
 
 config
+  .command('executor [type]')
+  .description('Select code generation backend (kiro or codex)')
+  .action(async (type?: string) => {
+    const { executor } = await import('./commands/executor.js');
+    await executor(type);
+  });
+
+config
   .command('show')
   .description('Show current configuration')
   .action(() => {
@@ -64,6 +72,7 @@ program
   .option('--dry-run', 'Show issues without processing')
   .option('--interval <seconds>', 'Polling interval in seconds')
   .option('-v, --verbose', 'Show detailed command output')
+  .option('-e, --executor <type>', 'Code generation backend (kiro or codex)')
   .action(async (opts) => {
     // Prompt for missing config
     if (!isConfigComplete()) {
@@ -99,7 +108,7 @@ program
     }
 
     const { run } = await import('./run.js');
-    await run({ dryRun: opts.dryRun, interval, verbose: opts.verbose });
+    await run({ dryRun: opts.dryRun, interval, verbose: opts.verbose, executor: opts.executor });
   });
 
 program.parse();

@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { loadConfig, validateConfig, type Config } from './config.js';
 import { getIssuesInColumn, type Issue } from './intake.js';
 import { buildContext, buildPlanContext, parsePRDescription, parsePlanOutput } from './context.js';
-import { executeKiro } from './executor.js';
+import { createExecutor, type ExecutorType, type Executor } from './executors/index.js';
 import { createBranchAndPR } from './git.js';
 import { addLabel, removeLabel, moveToInReview, moveToInProgress, postErrorComment, postPlanComment, createSubIssueInBacklog, ensureLabelsExist } from './status.js';
 
@@ -18,17 +18,19 @@ interface RunOptions {
   dryRun?: boolean;
   interval: number;
   verbose?: boolean;
+  executor?: ExecutorType;
 }
 
-async function processPlanIssue(config: Config, issue: Issue, runId: string, isRetry: boolean, verbose?: boolean): Promise<void> {
+async function processPlanIssue(config: Config, issue: Issue, runId: string, isRetry: boolean, executor: Executor, verbose?: boolean): Promise<void> {
   try {
-    const context = await buildPlanContext(issue);
-    console.log('📝 Built plan context, invoking kiro-cli...');
+    const context = await buildPlanContext(issue, executor.name as ExecutorType);
+    console.log(`📝 Built plan context, invoking ${executor.name}...`);
 
-    const result = await executeKiro(context, issue.model, verbose);
+    const model = executor.name === 'codex' ? config.codexModel : (issue.model || config.model);
+    const result = await executor.execute(context, { model, verbose });
 
     if (!result.success) {
-      console.error(`❌ kiro-cli failed with exit code ${result.exitCode}`);
+      console.error(`❌ ${executor.name} failed with exit code ${result.exitCode}`);
       await removeLabel(config, issue, 'running');
       
       if (isRetry) {
@@ -88,16 +90,17 @@ async function processPlanIssue(config: Config, issue: Issue, runId: string, isR
   }
 }
 
-async function processImplementIssue(config: Config, issue: Issue, runId: string, isRetry: boolean, verbose?: boolean): Promise<void> {
+async function processImplementIssue(config: Config, issue: Issue, runId: string, isRetry: boolean, executor: Executor, verbose?: boolean): Promise<void> {
   try {
     const skipCuration = isNoCurate(issue);
-    const context = await buildContext(issue, skipCuration);
-    console.log(`📝 Built context${skipCuration ? '' : ' (curated)'}, invoking kiro-cli...`);
+    const context = await buildContext(issue, skipCuration, executor.name as ExecutorType);
+    console.log(`📝 Built context${skipCuration ? '' : ' (curated)'}, invoking ${executor.name}...`);
 
-    const result = await executeKiro(context, issue.model, verbose);
+    const model = executor.name === 'codex' ? config.codexModel : (issue.model || config.model);
+    const result = await executor.execute(context, { model, verbose });
 
     if (!result.success) {
-      console.error(`❌ kiro-cli failed with exit code ${result.exitCode}`);
+      console.error(`❌ ${executor.name} failed with exit code ${result.exitCode}`);
       await removeLabel(config, issue, 'running');
       
       if (isRetry) {
@@ -112,9 +115,12 @@ async function processImplementIssue(config: Config, issue: Issue, runId: string
       return;
     }
 
-    console.log('✅ kiro-cli completed, creating PR...');
+    console.log(`✅ ${executor.name} completed, creating PR...`);
     if (result.credits !== undefined) {
       console.log(`💳 Credits: ${result.credits} • Time: ${result.timeSeconds}s`);
+    }
+    if (result.tokensUsed !== undefined) {
+      console.log(`🔢 Tokens: ${result.tokensUsed}`);
     }
     const prDescription = parsePRDescription(result.stdout);
     const prUrl = await createBranchAndPR(issue, prDescription, result.credits, result.timeSeconds);
@@ -139,7 +145,7 @@ async function processImplementIssue(config: Config, issue: Issue, runId: string
   }
 }
 
-async function processIssue(config: Config, issue: Issue, isRetry: boolean, verbose?: boolean): Promise<void> {
+async function processIssue(config: Config, issue: Issue, isRetry: boolean, executor: Executor, verbose?: boolean): Promise<void> {
   const runId = randomUUID().slice(0, 8);
   const isPlan = isPlanIssue(issue);
   const noCurate = isNoCurate(issue);
@@ -148,7 +154,7 @@ async function processIssue(config: Config, issue: Issue, isRetry: boolean, verb
     isPlan ? 'plan' : '',
     noCurate ? 'no-curate' : 'curate',
   ].filter(Boolean).join(', ');
-  console.log(`\n🚀 Processing issue #${issue.number}: ${issue.title} (run-id: ${runId}, ${tags})`);
+  console.log(`\n🚀 Processing issue #${issue.number}: ${issue.title} (run-id: ${runId}, ${tags}, executor: ${executor.name})`);
 
   if (isRetry) {
     await removeLabel(config, issue, 'retry');
@@ -156,9 +162,9 @@ async function processIssue(config: Config, issue: Issue, isRetry: boolean, verb
   await addLabel(config, issue, 'running');
 
   if (isPlan) {
-    await processPlanIssue(config, issue, runId, isRetry, verbose);
+    await processPlanIssue(config, issue, runId, isRetry, executor, verbose);
   } else {
-    await processImplementIssue(config, issue, runId, isRetry, verbose);
+    await processImplementIssue(config, issue, runId, isRetry, executor, verbose);
   }
 }
 
@@ -172,7 +178,18 @@ export async function run(options: RunOptions): Promise<void> {
   }
 
   const config = loadConfig();
-  console.log(`🔄 VibeSprint started (interval: ${options.interval}s, dry-run: ${options.dryRun ?? false})`);
+  
+  // Create and validate executor
+  const executorType = options.executor || config.executor || 'kiro';
+  const executor = createExecutor(executorType);
+  const execValidation = await executor.validateSetup();
+  if (!execValidation.valid) {
+    console.error(`❌ ${executor.name} setup issues:\n`);
+    execValidation.errors.forEach(e => console.error(`  • ${e}`));
+    process.exit(1);
+  }
+
+  console.log(`🔄 VibeSprint started (executor: ${executor.name}, interval: ${options.interval}s, dry-run: ${options.dryRun ?? false})`);
 
   // Check labels
   console.log('🏷️ Checking labels...');
@@ -207,7 +224,7 @@ export async function run(options: RunOptions): Promise<void> {
 
     const issue = issues[0];
     const isRetry = issue.labels.includes('retry');
-    await processIssue(config, issue, isRetry, options.verbose);
+    await processIssue(config, issue, isRetry, executor, options.verbose);
     
     await poll();
   };
