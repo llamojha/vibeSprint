@@ -115,7 +115,7 @@ export class GitHubProvider implements IssueProvider {
       '--project-id', this.config.projectId,
       '--field-id', this.config.columnFieldId!,
       '--single-select-option-id', this.getColumnOptionId(column)!,
-    ]);
+    ], false);
   }
 
   private getColumnOptionId(column: 'backlog' | 'inProgress' | 'inReview'): string | undefined {

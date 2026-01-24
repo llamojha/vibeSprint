@@ -28,9 +28,9 @@ export function ghJson<T>(args: string[]): T | null {
   }
 }
 
-export function ghProject(args: string[]): GhResult {
+export function ghProject(args: string[], includeOwner = true): GhResult {
   const config = loadConfig();
-  const ownerArgs = config.owner ? ['--owner', config.owner] : [];
+  const ownerArgs = includeOwner && config.owner ? ['--owner', config.owner] : [];
   const result = spawnSync('gh', ['project', ...args, ...ownerArgs], { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
   return {
     success: result.status === 0,
