@@ -1,4 +1,4 @@
-HELLO WORLD
+HLLO WORLD
 
 # VibeSprint
 
