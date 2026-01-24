@@ -19,6 +19,7 @@ export interface RepoConfig {
   inProgressColumnName: string;
   inReviewOptionId: string;
   inReviewColumnName: string;
+  labelsChecked?: boolean;
 }
 
 export interface Config {

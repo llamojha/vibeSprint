@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
-import { loadConfig, type RepoConfig, type Config } from '../config.js';
+import { loadConfig, saveConfig, type RepoConfig, type Config } from '../config.js';
 import { GitHubProvider } from '../providers/github.js';
 import { createExecutor, type ExecutorType } from '../executors/index.js';
 import { buildContext, buildPlanContext, parsePRDescription, parsePlanOutput } from '../context.js';
@@ -159,14 +159,13 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
 
   const [detaching, setDetaching] = useState(false);
 
-  useInput((input, key) => {
+  useInput(async (input, key) => {
     if (input === 'q') exit();
     if (input === 'd' && !detaching) {
       setDetaching(true);
-      import('../daemon.js').then(({ startDaemon }) => {
-        startDaemon(interval);
-        exit();
-      });
+      const { startDaemon } = await import('../daemon.js');
+      startDaemon(interval);
+      process.exit(0);
     }
     if (key.upArrow) setSelectedRepo(prev => Math.max(0, prev - 1));
     if (key.downArrow) setSelectedRepo(prev => Math.min(config.repos.length - 1, prev + 1));
@@ -235,15 +234,20 @@ export async function runDashboard(interval: number, verbose?: boolean): Promise
     process.exit(1);
   }
 
-  // Ensure labels exist first
-  console.log('🏷️  Checking labels...');
-  for (const repo of config.repos) {
-    process.stdout.write(`   ${repo.name}...`);
-    const provider = new GitHubProvider(repo);
-    await provider.ensureLabelsExist();
-    console.log(' ✓');
+  // Check labels only for repos that haven't been checked
+  const uncheckedRepos = config.repos.filter(r => !r.labelsChecked);
+  if (uncheckedRepos.length > 0) {
+    console.log('🏷️  Checking labels...');
+    for (const repo of uncheckedRepos) {
+      process.stdout.write(`   ${repo.name}...`);
+      const provider = new GitHubProvider(repo);
+      await provider.ensureLabelsExist();
+      repo.labelsChecked = true;
+      console.log(' ✓');
+    }
+    saveConfig(config);
+    console.clear();
   }
-  console.clear();
 
   render(<Dashboard config={config} interval={interval} verbose={verbose} />);
 }
