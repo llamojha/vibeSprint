@@ -134,26 +134,33 @@ export class GitHubProvider implements IssueProvider {
   ): Promise<{ id: number; number: number }> {
     const fullBody = `${body}\n\n---\n*Part of #${parentIssue.number}*`;
     
-    const result = ghJson<{ number: number; id: number; url: string }>([
+    const res = gh([
       'issue', 'create',
       '--title', title,
       '--body', fullBody,
-      '--json', 'number,id,url',
     ]);
 
-    if (!result) {
-      throw new Error('Failed to create sub-issue');
+    if (!res.success) {
+      throw new Error(`Failed to create sub-issue: ${res.stderr}`);
     }
+
+    // Parse issue URL from output: https://github.com/owner/repo/issues/123
+    const urlMatch = res.stdout.match(/https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/(\d+)/);
+    if (!urlMatch) {
+      throw new Error(`Failed to parse issue URL from: ${res.stdout}`);
+    }
+    const issueNumber = parseInt(urlMatch[1], 10);
+    const issueUrl = urlMatch[0];
 
     // Add to project
     if (this.config.projectNumber) {
       ghProject([
         'item-add', String(this.config.projectNumber),
-        '--url', result.url,
+        '--url', issueUrl,
       ]);
     }
 
-    return { id: result.id, number: result.number };
+    return { id: issueNumber, number: issueNumber };
   }
 
   async ensureLabelsExist(): Promise<void> {
