@@ -41,8 +41,8 @@ export class GitHubProvider implements IssueProvider {
       '--format', 'json',
     ], this.repo.owner);
 
+    // Empty project or no items is valid - just return empty array
     if (!result) {
-      console.error(`Error: Failed to fetch project items for ${this.repo.name}`);
       return [];
     }
 

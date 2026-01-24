@@ -1,31 +1,37 @@
 import { select, input } from '@inquirer/prompts';
 import { loadConfig, saveConfig, AVAILABLE_MODELS, CODEX_MODELS } from '../config.js';
 import { addRepoCommand } from './add-repo.js';
+import { isDaemonRunning, startDaemon, stopDaemon, tailLog } from '../daemon.js';
 import { VERSION } from '../cli.js';
 
-export async function mainMenu(): Promise<void> {
+export async function mainMenu(): Promise<'dashboard' | 'quit'> {
   while (true) {
     const config = loadConfig();
     const repoCount = config.repos.length;
     const executor = config.executor || 'kiro';
     const model = config.model || 'auto';
+    const daemonRunning = isDaemonRunning();
 
     console.clear();
     console.log(`VibeSprint v${VERSION}\n${'─'.repeat(20)}\n`);
 
-    const choice = await select({
-      message: 'What would you like to do?',
-      choices: [
-        { name: 'Start', value: 'start' },
-        { name: `Repos (${repoCount} configured)`, value: 'repos' },
-        { name: `Executor: ${executor}`, value: 'executor' },
-        { name: `Model: ${model}`, value: 'model' },
-        { name: 'Quit', value: 'quit' },
-      ],
-    });
+    if (daemonRunning) {
+      console.log('\x1b[32m● Daemon running in background\x1b[0m\n');
+    }
+
+    const choices = [
+      { name: daemonRunning ? 'View Dashboard' : 'Start', value: 'start' },
+      ...(daemonRunning ? [{ name: 'Stop Daemon', value: 'stop' }] : []),
+      { name: `Repos (${repoCount} configured)`, value: 'repos' },
+      { name: `Executor: ${executor}`, value: 'executor' },
+      { name: `Model: ${model}`, value: 'model' },
+      { name: 'Quit', value: 'quit' },
+    ];
+
+    const choice = await select({ message: 'What would you like to do?', choices });
 
     if (choice === 'quit') {
-      break;
+      return 'quit';
     }
 
     if (choice === 'start') {
@@ -33,8 +39,17 @@ export async function mainMenu(): Promise<void> {
         console.log('\n⚠️  No repos configured. Add one first.\n');
         await addRepoCommand();
       } else {
-        return; // Exit menu, cli.ts will call run()
+        return 'dashboard';
       }
+    }
+
+    if (choice === 'stop') {
+      if (stopDaemon()) {
+        console.log('✓ Daemon stopped');
+      } else {
+        console.log('Failed to stop daemon');
+      }
+      await input({ message: 'Press enter to continue...' });
     }
 
     if (choice === 'repos') {
@@ -52,7 +67,6 @@ export async function mainMenu(): Promise<void> {
       });
       const cfg = loadConfig();
       cfg.executor = newExecutor as 'kiro' | 'codex';
-      // Reset model to default for new executor
       cfg.model = newExecutor === 'codex' ? 'gpt-5.2-codex' : 'auto';
       cfg.codexModel = newExecutor === 'codex' ? 'gpt-5.2-codex' : undefined;
       saveConfig(cfg);
@@ -69,8 +83,6 @@ export async function mainMenu(): Promise<void> {
       saveConfig({ ...loadConfig(), model: newModel });
     }
   }
-
-  process.exit(0);
 }
 
 async function reposMenu(): Promise<void> {
@@ -97,7 +109,6 @@ async function reposMenu(): Promise<void> {
       continue;
     }
 
-    // Selected existing repo
     await repoDetailMenu(choice);
   }
 }

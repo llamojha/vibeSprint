@@ -157,8 +157,17 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
     return () => clearInterval(id);
   }, []);
 
+  const [detaching, setDetaching] = useState(false);
+
   useInput((input, key) => {
     if (input === 'q') exit();
+    if (input === 'd' && !detaching) {
+      setDetaching(true);
+      import('../daemon.js').then(({ startDaemon }) => {
+        startDaemon(interval);
+        exit();
+      });
+    }
     if (key.upArrow) setSelectedRepo(prev => Math.max(0, prev - 1));
     if (key.downArrow) setSelectedRepo(prev => Math.min(config.repos.length - 1, prev + 1));
   });
@@ -180,45 +189,40 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold>VibeSprint v{VERSION}</Text>
-      <Text>{'═'.repeat(40)}</Text>
+      <Text>{'═'.repeat(50)}</Text>
       <Text> </Text>
 
-      <Box flexDirection="row">
-        <Box flexDirection="column">
-          <Text bold>Repos ({config.repos.length})</Text>
-          <Text>{'─'.repeat(20)}</Text>
-          {repoStatuses.map((r, i) => (
-            <Text key={r.name}>
-              <Text color={i === selectedRepo ? 'cyan' : undefined}>
-                {i === selectedRepo ? '▸ ' : '  '}
-              </Text>
-              <Text color={statusColor(r.status)}>{statusIcon(r.status)} </Text>
-              <Text>{r.name}</Text>
-              <Text color="gray"> ({r.issueCount})</Text>
-            </Text>
-          ))}
-        </Box>
+      <Text bold>Repos ({config.repos.length})</Text>
+      <Text>{'─'.repeat(30)}</Text>
+      {repoStatuses.map((r, i) => (
+        <Text key={r.name}>
+          <Text color={i === selectedRepo ? 'cyan' : undefined}>
+            {i === selectedRepo ? '▸ ' : '  '}
+          </Text>
+          <Text color={statusColor(r.status)}>{statusIcon(r.status)} </Text>
+          <Text>{r.name}</Text>
+          <Text color="gray"> ({r.issueCount} ready)</Text>
+        </Text>
+      ))}
 
-        <Box flexDirection="column" marginLeft={2}>
-          <Text bold>Recent Activity</Text>
-          <Text>{'─'.repeat(35)}</Text>
-          {activity.length === 0 && <Text color="gray">No activity yet</Text>}
-          {activity.map((a, i) => (
-            <Text key={i}>
-              <Text>{a.icon} </Text>
-              <Text>{a.text.slice(0, 30)}</Text>
-              <Text color="gray"> ({formatTime(a.time)})</Text>
-            </Text>
-          ))}
-        </Box>
-      </Box>
+      <Text> </Text>
+      <Text bold>Recent Activity</Text>
+      <Text>{'─'.repeat(50)}</Text>
+      {activity.length === 0 && <Text color="gray">No activity yet</Text>}
+      {activity.map((a, i) => (
+        <Text key={i}>
+          <Text>{a.icon} </Text>
+          <Text>{a.text}</Text>
+          <Text color="gray"> ({formatTime(a.time)})</Text>
+        </Text>
+      ))}
 
       <Text> </Text>
       {currentIssue && (
         <Text color="green">⚙ Processing: {currentIssue}</Text>
       )}
       <Text> </Text>
-      <Text color="gray">[q] Quit  •  Polling every {interval}s</Text>
+      <Text color="gray">[q] Quit  [d] Detach  •  Polling every {interval}s</Text>
     </Box>
   );
 }
@@ -232,10 +236,14 @@ export async function runDashboard(interval: number, verbose?: boolean): Promise
   }
 
   // Ensure labels exist first
+  console.log('🏷️  Checking labels...');
   for (const repo of config.repos) {
+    process.stdout.write(`   ${repo.name}...`);
     const provider = new GitHubProvider(repo);
     await provider.ensureLabelsExist();
+    console.log(' ✓');
   }
+  console.clear();
 
   render(<Dashboard config={config} interval={interval} verbose={verbose} />);
 }

@@ -21,9 +21,13 @@ program
 program
   .action(async () => {
     const { mainMenu } = await import('./commands/menu.js');
-    await mainMenu();
+    const result = await mainMenu();
     
-    // If menu returns (user selected Start), run dashboard
+    if (result === 'quit') {
+      process.exit(0);
+    }
+    
+    // User selected Start - run dashboard
     const cfg = loadConfig();
     let interval = cfg.interval;
     if (!interval) {
