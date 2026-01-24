@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { render, Box, Text, useInput, useApp } from 'ink';
 import { loadConfig, saveConfig, type RepoConfig, type Config } from '../config.js';
-import { GitHubProvider } from '../providers/github.js';
+import { createProvider } from '../providers/index.js';
 import { createExecutor, type ExecutorType } from '../executors/index.js';
 import { buildContext, buildPlanContext, parsePRDescription, parsePlanOutput } from '../context.js';
 import { createBranchAndPR } from '../git.js';
@@ -140,7 +140,7 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
       const repo = cfg.repos[i];
       setRepoStatuses(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'polling' } : r));
 
-      const provider = new GitHubProvider(repo);
+      const provider = createProvider(repo);
       const issues = await provider.getIssues();
 
       setRepoStatuses(prev => prev.map((r, idx) =>
@@ -279,7 +279,7 @@ export async function runDashboard(interval: number, verbose?: boolean): Promise
     console.log('🏷️  Checking labels...');
     for (const repo of uncheckedRepos) {
       process.stdout.write(`   ${repo.name}...`);
-      const provider = new GitHubProvider(repo);
+      const provider = createProvider(repo);
       await provider.ensureLabelsExist();
       repo.labelsChecked = true;
       console.log(' ✓');

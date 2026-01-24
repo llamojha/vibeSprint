@@ -2,142 +2,145 @@
 
 > **Turn GitHub issues into pull requests automatically** — Just add an issue to your "Ready" column and watch VibeSprint generate, commit, and open a PR for you.
 
-A self-hosted CLI that monitors your GitHub Project board and automatically converts issues into production-ready pull requests using `kiro-cli` or OpenAI's `codex` CLI. No servers, no webhooks, no complexity — just `npm install` and run.
+A self-hosted CLI that monitors your GitHub Project board or Linear workspace and automatically converts issues into production-ready pull requests using `kiro-cli` or OpenAI's `codex` CLI. No servers, no webhooks, no complexity — just `npm install` and run.
 
 📋 **Live Project Board**: [See it in action](https://github.com/users/llamojha/projects/7) • 🎥 **Demo Video**: [Watch the workflow](https://www.youtube.com/watch?v=qomajZkC1fU)
 
 ## Quick Start
 
 ```bash
-# 1. Install prerequisites
-# - Node.js 18+ (https://nodejs.org)
-# - GitHub CLI (https://cli.github.com)
-# - kiro-cli (https://kiro.dev/docs/cli/installation)
-
-# 2. Authenticate with GitHub CLI
-gh auth login
-
-# 3. Install VibeSprint
+# 1. Install VibeSprint
 git clone https://github.com/amllamojha/vibesprint.git
 cd vibesprint && npm install && npm run build && npm link
 
-# 4. Setup in your project
-cd /path/to/your/project
-echo ".vibesprint" >> .gitignore
-
-# 5. Run (first time will prompt for project/column setup)
-vibesprint run
+# 2. Launch the TUI
+vibesprint
 ```
 
-**That's it!** Add issues to your "Ready" column and watch them become PRs automatically.
+The interactive menu guides you through setup. Select **Repos → Add new repo** to configure your first repository.
 
 ## Setup
 
 ### 1. Prerequisites
 
-**Node.js 18+**
-- Download from [nodejs.org](https://nodejs.org)
-- Verify: `node --version` (should be 18.0.0 or higher)
+**Required:**
+- Node.js 18+ ([nodejs.org](https://nodejs.org))
+- GitHub CLI ([cli.github.com](https://cli.github.com))
+- Kiro CLI ([kiro.dev](https://kiro.dev/docs/cli/installation))
 
-**GitHub CLI**
-- Install from [cli.github.com](https://cli.github.com)
-- Verify: `gh --version`
-- Authenticate: `gh auth login`
-
-**Kiro CLI**
-- Install from [kiro.dev](https://kiro.dev/docs/cli/installation)
-- Verify: `kiro-cli --version`
-
-**OpenAI Codex CLI (Optional)**
-- Install: `npm install -g @openai/codex`
-- Verify: `codex --version`
-- Authenticate: `codex login`
+**Optional:**
+- OpenAI Codex CLI: `npm install -g @openai/codex`
 
 ### 2. Provider Authentication
 
-VibeSprint supports two issue tracking providers: **GitHub Projects** (default) and **Linear**.
+VibeSprint supports two issue tracking providers: **GitHub Projects** and **Linear**.
 
 #### GitHub Projects
 
-VibeSprint uses the GitHub CLI (`gh`) for all GitHub operations:
-
 ```bash
-# Basic authentication
 gh auth login
-
-# Add GitHub Projects scope (required for project board access)
-gh auth refresh -s project
+gh auth refresh -s project  # Required for project board access
 ```
 
-#### Linear (Alternative)
-
-To use Linear as your issue source instead of GitHub Projects:
+#### Linear
 
 1. **Enable Linear GitHub Integration** (required for PR linking)
-   - Go to Linear Settings → Integrations → GitHub
-   - Connect your GitHub organization/repos
-   - This allows VibeSprint to link PRs to Linear issues
+   - Linear Settings → Integrations → GitHub → Connect your repos
 
 2. **Create a Linear API Key**
-   - Go to Linear Settings → API → Personal API keys
-   - Create a new key with read/write access
-   - Set as environment variable: `export LINEAR_API_KEY=lin_api_...`
-   - Or configure via CLI during `vibesprint config add-repo --linear`
+   - Linear Settings → Account → Security → API
+   - Or visit: `https://linear.app/<your-workspace>/settings/account/security`
+   - Set: `export LINEAR_API_KEY=lin_api_...`
 
-3. **Configure a repo with Linear**
-   ```bash
-   vibesprint config add-repo --linear
+### 3. Configure via TUI
+
+Launch VibeSprint and follow the interactive setup:
+
+```bash
+vibesprint
+```
+
+```
+VibeSprint v0.5.0
+────────────────────
+
+? What would you like to do?
+❯ Start
+  Repos (0 configured)
+  Executor: kiro
+  Model: auto
+  Quit
+```
+
+#### Adding a Repository
+
+1. Select **Repos** → **+ Add new repo**
+2. Choose your issue source:
+   ```
+   ? Issue source:
+   ❯ GitHub Projects
+     Linear
    ```
 
-### 3. GitHub Project Board Setup
+**For GitHub Projects:**
+- Enter repo owner and name
+- Select local path to repo clone
+- Choose GitHub Project board
+- Map columns (Backlog, Ready, In Progress, In Review)
 
-Create a GitHub Project board with these columns:
+**For Linear:**
+- Enter/confirm Linear API key
+- Select Linear team
+- Map workflow states to columns
+- Choose if team is shared across repos (enables label filtering)
+- Enter GitHub repo info (where PRs will be created)
+- Select local path
 
-1. **Go to your repository**
-2. **Click "Projects" tab → "New project"**
-3. **Choose "Board" template**
-4. **Create 4 columns** (in this order):
-   - `Backlog` - For sub-issues (not monitored)
-   - `Ready` - Issues here get processed automatically
-   - `In Progress` - Issues being worked on
-   - `In Review` - Issues with open PRs
+#### Multi-Repo Support
 
-### 4. Installation
+Add multiple repositories with different providers:
 
-```bash
-# Clone and install
-git clone https://github.com/amllamojha/vibesprint.git
-cd vibesprint
-npm install
-npm run build
-npm link
+```
+? Manage repositories:
+  + Add new repo
+  vibesprint [GitHub] (llamojha/vibesprint)
+  backend-api [Linear] (llamojha/backend-api)
+  ← Back
 ```
 
-### 5. Project Configuration
+Each repo can use either GitHub Projects or Linear independently.
 
-Navigate to your target repository and run the setup:
+#### Shared Linear Teams
 
-```bash
-cd /path/to/your/project
+If your Linear team manages multiple GitHub repos, use label-based filtering:
 
-# Add config file to gitignore
-echo ".vibesprint" >> .gitignore
+1. When adding a Linear repo, answer "Yes" to "Is this team shared across multiple GitHub repos?"
+2. Enter a label (default: `repo:<reponame>`)
+3. VibeSprint creates this label in Linear automatically
+4. Only issues with this label are processed for this repo
 
-# First run will prompt for configuration
-vibesprint run
+### 4. Run
+
+From the main menu, select **Start** to launch the dashboard:
+
+```
+VibeSprint v0.5.0 • Monitoring 2 repo(s)
+────────────────────────────────────────
+
+vibesprint [GitHub]     ● Ready    0 issues
+backend-api [Linear]    ● Ready    2 issues
+
+Press q to quit, r to refresh
 ```
 
-The CLI will ask you to:
-1. **Link to a GitHub Project** - Select from your available projects
-2. **Choose columns** - Map your board columns to workflow states
-3. **Set polling interval** - How often to check for new issues (default: 60s)
+Or use CLI flags:
 
-### 6. Test the Setup
-
-1. **Create a test issue** in your repository
-2. **Add it to your "Ready" column**
-3. **Watch the logs** - it should pick up the issue within your polling interval
-4. **Check for the PR** - a new branch and PR should be created automatically
+```bash
+vibesprint run              # Start polling
+vibesprint run --dry-run    # Preview without processing
+vibesprint run --interval 30 # Custom poll interval
+vibesprint run --verbose    # Show executor commands
+```
 
 ## ✨ Key Features
 

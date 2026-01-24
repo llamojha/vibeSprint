@@ -9,6 +9,12 @@ const VIBESPRINT_LABELS = [
   'vibesprint:failed',
   'vibesprint:pr-opened',
   'vibesprint:plan-posted',
+  'plan',
+  'no-curate',
+  'model:auto', 'model:claude-sonnet-4.5', 'model:claude-sonnet-4',
+  'model:claude-haiku-4.5', 'model:claude-opus-4.5',
+  'model:gpt-5.2-codex', 'model:gpt-5.2', 'model:gpt-5.1-codex-max', 'model:gpt-5.1-codex-mini',
+  'executor:kiro', 'executor:codex',
 ];
 
 export class LinearProvider implements IssueProvider {
