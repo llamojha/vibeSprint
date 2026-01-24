@@ -1,6 +1,10 @@
 {
   "name": "vibesprint",
+<<<<<<< Updated upstream
   "version": "0.3.7",
+=======
+  "version": "0.3.5",
+>>>>>>> Stashed changes
   "description": "GitHub-driven local automation for issue-to-PR workflows",
   "type": "module",
   "author": "llamojha",

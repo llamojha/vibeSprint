@@ -104,7 +104,8 @@ vibesprint run
 The CLI will ask you to:
 1. **Link to a GitHub Project** - Select from your available projects
 2. **Choose columns** - Map your board columns to workflow states
-3. **Set polling interval** - How often to check for new issues (default: 60s)
+3. **Select model** - Choose from available Kiro or Codex models
+4. **Set polling interval** - How often to check for new issues (default: 60s)
 
 ### 6. Test the Setup
 
@@ -117,9 +118,10 @@ The CLI will ask you to:
 
 - **🎯 Issue → PR in minutes**: Drop an issue in your "Ready" column, get a complete PR with code, tests, and documentation
 - **🧠 Smart planning**: Add a `plan` label to break complex features into manageable sub-issues automatically  
-- **⚡ Parallel execution**: Uses Kiro's subagent system to handle multiple tasks simultaneously
+- **⚡ Dual execution engines**: Choose between Kiro CLI (with latest Claude models) or OpenAI Codex (with GPT-5.2 models)
 - **🔒 Fully local**: Runs on your machine with your credentials — no cloud dependencies
-- **🎨 Workflow innovation**: 30+ custom Kiro prompts for debugging, planning, and code review
+- **🎨 Provider architecture**: Extensible design with GitHub provider and room for future integrations
+- **📊 Usage tracking**: Monitor credits (Kiro) or tokens (Codex) with detailed execution metrics
 
 ## How It Works
 
@@ -231,6 +233,9 @@ vibesprint config link
 
 # Reconfigure columns
 vibesprint config column
+
+# Select executor (kiro or codex)
+vibesprint config executor
 ```
 
 ## Troubleshooting
@@ -260,11 +265,16 @@ src/
 │   ├── link.ts      # Project linking
 │   ├── column.ts    # Column selection
 │   └── executor.ts  # Executor selection
-└── executors/
-    ├── types.ts     # Executor interface
-    ├── kiro.ts      # Kiro CLI executor
-    ├── codex.ts     # OpenAI Codex executor
-    └── index.ts     # Factory and exports
+├── executors/
+│   ├── types.ts     # Executor interface
+│   ├── kiro.ts      # Kiro CLI executor
+│   ├── codex.ts     # OpenAI Codex executor
+│   └── index.ts     # Factory and exports
+├── providers/
+│   ├── types.ts     # Provider interface
+│   └── github.ts    # GitHub API provider
+└── utils/
+    └── gh.ts        # GitHub CLI utilities
 ```
 
 ## License
