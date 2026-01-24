@@ -16,6 +16,7 @@ export interface ExecutorOptions {
   verbose?: boolean;
   timeout?: number;
   cwd?: string;
+  onOutput?: (text: string) => void;
 }
 
 export interface Executor {

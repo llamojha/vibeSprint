@@ -6,6 +6,7 @@ import { createExecutor, type ExecutorType } from '../executors/index.js';
 import { buildContext, buildPlanContext, parsePRDescription, parsePlanOutput } from '../context.js';
 import { createBranchAndPR } from '../git.js';
 import { addLabel, removeLabel, moveToInReview, moveToInProgress, postErrorComment, postPlanComment, createSubIssueInBacklog } from '../status.js';
+import { startIssueLog, appendIssueLog, readIssueLog } from '../issue-logs.js';
 import type { Issue } from '../providers/types.js';
 import { VERSION } from '../cli.js';
 import { randomUUID } from 'crypto';
@@ -14,12 +15,15 @@ interface RepoStatus {
   name: string;
   issueCount: number;
   status: 'idle' | 'polling' | 'processing';
+  currentIssue?: string;
 }
 
 interface ActivityItem {
   time: Date;
   icon: string;
   text: string;
+  repoName: string;
+  issueNumber: number;
 }
 
 interface DashboardProps {
@@ -42,11 +46,16 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
     config.repos.map(r => ({ name: r.name, issueCount: 0, status: 'idle' }))
   );
   const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const [currentIssue, setCurrentIssue] = useState<string | null>(null);
-  const [selectedRepo, setSelectedRepo] = useState(0);
+  const [selectedActivity, setSelectedActivity] = useState(0);
+  const [viewingLog, setViewingLog] = useState<{ repoName: string; issueNumber: number } | null>(null);
+  const [logContent, setLogContent] = useState('');
 
-  const addActivity = (icon: string, text: string) => {
-    setActivity(prev => [{ time: new Date(), icon, text }, ...prev].slice(0, 10));
+  const addActivity = (icon: string, text: string, repoName: string, issueNumber: number) => {
+    setActivity(prev => [{ time: new Date(), icon, text, repoName, issueNumber }, ...prev].slice(0, 20));
+  };
+
+  const updateRepoStatus = (repoName: string, updates: Partial<RepoStatus>) => {
+    setRepoStatuses(prev => prev.map(r => r.name === repoName ? { ...r, ...updates } : r));
   };
 
   const processIssue = async (cfg: Config, issue: Issue) => {
@@ -54,9 +63,12 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
     const isPlan = issue.labels.some(l => l.toLowerCase() === 'plan');
     const executorType = issue.executor || cfg.executor || 'kiro';
     const executor = createExecutor(executorType);
+    const repoName = issue.repoConfig?.name || 'unknown';
 
-    setCurrentIssue(`#${issue.number}: ${issue.title}`);
-    addActivity('⚙', `#${issue.number} ${issue.title} → processing...`);
+    updateRepoStatus(repoName, { status: 'processing', currentIssue: `#${issue.number} ${issue.title.slice(0, 30)}...` });
+    startIssueLog(repoName, issue.number, issue.title);
+
+    const onOutput = (text: string) => appendIssueLog(repoName, issue.number, text);
 
     try {
       await addLabel(issue, 'running');
@@ -64,13 +76,13 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
       if (isPlan) {
         const context = await buildPlanContext(issue, executorType);
         const model = executorType === 'codex' ? cfg.codexModel : (issue.model || cfg.model);
-        const result = await executor.execute(context, { model, verbose, cwd: issue.repoConfig?.path });
+        const result = await executor.execute(context, { model, verbose, cwd: issue.repoConfig?.path, onOutput });
 
         if (!result.success) {
           await removeLabel(issue, 'running');
           await addLabel(issue, 'retry');
           await postErrorComment(issue, runId, result.exitCode, result.stdout, result.stderr);
-          addActivity('✗', `#${issue.number} → failed`);
+          addActivity('✗', `#${issue.number} → failed`, repoName, issue.number);
           return;
         }
 
@@ -84,19 +96,19 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
           await removeLabel(issue, 'running');
           await addLabel(issue, 'plan-posted');
           await moveToInProgress(issue);
-          addActivity('✓', `#${issue.number} → plan posted (${tasks.length} tasks)`);
+          addActivity('✓', `#${issue.number} → plan (${tasks.length} tasks)`, repoName, issue.number);
         }
       } else {
         const skipCuration = issue.labels.some(l => l.toLowerCase() === 'no-curate');
         const context = await buildContext(issue, skipCuration, executorType);
         const model = executorType === 'codex' ? cfg.codexModel : (issue.model || cfg.model);
-        const result = await executor.execute(context, { model, verbose, cwd: issue.repoConfig?.path });
+        const result = await executor.execute(context, { model, verbose, cwd: issue.repoConfig?.path, onOutput });
 
         if (!result.success) {
           await removeLabel(issue, 'running');
           await addLabel(issue, 'retry');
           await postErrorComment(issue, runId, result.exitCode, result.stdout, result.stderr);
-          addActivity('✗', `#${issue.number} → failed`);
+          addActivity('✗', `#${issue.number} → failed`, repoName, issue.number);
           return;
         }
 
@@ -107,16 +119,16 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
         await removeLabel(issue, 'running');
         await addLabel(issue, 'pr-opened');
         await moveToInReview(issue);
-        addActivity('✓', `#${issue.number} → PR #${prNum}`);
+        addActivity('✓', `#${issue.number} → PR #${prNum}`, repoName, issue.number);
       }
     } catch (err) {
       await removeLabel(issue, 'running');
       await addLabel(issue, 'retry');
       const errorMsg = err instanceof Error ? err.message : String(err);
       await postErrorComment(issue, runId, 1, '', errorMsg);
-      addActivity('✗', `#${issue.number} → error`);
+      addActivity('✗', `#${issue.number} → error`, repoName, issue.number);
     } finally {
-      setCurrentIssue(null);
+      updateRepoStatus(repoName, { status: 'idle', currentIssue: undefined });
     }
   };
 
@@ -151,24 +163,36 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
     }
   };
 
-  useEffect(() => {
-    poll();
-    const id = setInterval(poll, interval * 1000);
-    return () => clearInterval(id);
-  }, []);
-
+  const [currentInterval, setCurrentInterval] = useState(interval);
   const [detaching, setDetaching] = useState(false);
 
+  useEffect(() => {
+    poll();
+    const id = setInterval(poll, currentInterval * 1000);
+    return () => clearInterval(id);
+  }, [currentInterval]);
+
   useInput(async (input, key) => {
+    if (viewingLog) {
+      if (input === 'q' || key.escape) setViewingLog(null);
+      return;
+    }
     if (input === 'q') exit();
     if (input === 'd' && !detaching) {
       setDetaching(true);
       const { startDaemon } = await import('../daemon.js');
-      startDaemon(interval);
+      startDaemon(currentInterval);
       process.exit(0);
     }
-    if (key.upArrow) setSelectedRepo(prev => Math.max(0, prev - 1));
-    if (key.downArrow) setSelectedRepo(prev => Math.min(config.repos.length - 1, prev + 1));
+    if (input === '+' || input === '=') setCurrentInterval(prev => Math.min(300, prev + 10));
+    if (input === '-') setCurrentInterval(prev => Math.max(10, prev - 10));
+    if (key.upArrow) setSelectedActivity(prev => Math.max(0, prev - 1));
+    if (key.downArrow) setSelectedActivity(prev => Math.min(activity.length - 1, prev + 1));
+    if (key.return && activity[selectedActivity]) {
+      const item = activity[selectedActivity];
+      setLogContent(readIssueLog(item.repoName, item.issueNumber));
+      setViewingLog({ repoName: item.repoName, issueNumber: item.issueNumber });
+    }
   });
 
   const statusIcon = (s: RepoStatus['status']) => {
@@ -185,6 +209,20 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
 
   const truncate = (s: string, len: number) => s.length > len ? s.slice(0, len - 1) + '…' : s;
 
+  if (viewingLog) {
+    const lines = logContent.split('\n');
+    const displayLines = lines.slice(-30);
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text bold color="cyan">Log: {viewingLog.repoName} #{viewingLog.issueNumber}</Text>
+        <Text dimColor>Press q to return</Text>
+        <Box marginTop={1} flexDirection="column">
+          {displayLines.map((line, i) => <Text key={i}>{line}</Text>)}
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold>VibeSprint v{VERSION}</Text>
@@ -193,15 +231,17 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
 
       <Text bold>Repos ({config.repos.length})</Text>
       <Text>{'─'.repeat(30)}</Text>
-      {repoStatuses.map((r, i) => (
-        <Text key={r.name}>
-          <Text color={i === selectedRepo ? 'cyan' : undefined}>
-            {i === selectedRepo ? '▸ ' : '  '}
+      {repoStatuses.map((r) => (
+        <Box key={r.name} flexDirection="column">
+          <Text>
+            <Text color={statusColor(r.status)}>{statusIcon(r.status)} </Text>
+            <Text>{r.name}</Text>
+            <Text color="gray"> ({r.issueCount} ready)</Text>
           </Text>
-          <Text color={statusColor(r.status)}>{statusIcon(r.status)} </Text>
-          <Text>{r.name}</Text>
-          <Text color="gray"> ({r.issueCount} ready)</Text>
-        </Text>
+          {r.currentIssue && (
+            <Text color="green">  └─ {truncate(r.currentIssue, 45)}</Text>
+          )}
+        </Box>
       ))}
 
       <Text> </Text>
@@ -210,6 +250,9 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
       {activity.length === 0 && <Text color="gray">No activity yet</Text>}
       {activity.map((a, i) => (
         <Text key={i}>
+          <Text color={i === selectedActivity ? 'cyan' : undefined}>
+            {i === selectedActivity ? '▸ ' : '  '}
+          </Text>
           <Text>{a.icon} </Text>
           <Text>{a.text}</Text>
           <Text color="gray"> ({formatTime(a.time)})</Text>
@@ -217,11 +260,7 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
       ))}
 
       <Text> </Text>
-      {currentIssue && (
-        <Text color="green">⚙ Processing: {currentIssue}</Text>
-      )}
-      <Text> </Text>
-      <Text color="gray">[q] Quit  [d] Detach  •  Polling every {interval}s</Text>
+      <Text color="gray">[q] Quit  [d] Detach  [↑↓] Select  [Enter] Log  [+/-] Interval ({currentInterval}s)</Text>
     </Box>
   );
 }

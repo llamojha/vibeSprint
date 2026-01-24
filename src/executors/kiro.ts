@@ -54,6 +54,7 @@ export class KiroExecutor implements Executor {
     return new Promise((resolve) => {
       const stdout: string[] = [];
       const stderr: string[] = [];
+      const onOutput = options?.onOutput;
 
       const child = spawn('kiro-cli', args, {
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -63,13 +64,15 @@ export class KiroExecutor implements Executor {
       child.stdout.on('data', (data) => {
         const text = data.toString();
         stdout.push(text);
-        process.stdout.write(text);
+        if (onOutput) onOutput(text);
+        else process.stdout.write(text);
       });
 
       child.stderr.on('data', (data) => {
         const text = data.toString();
         stderr.push(text);
-        process.stderr.write(text);
+        if (onOutput) onOutput(text);
+        else process.stderr.write(text);
       });
 
       const timeout = setTimeout(() => {
