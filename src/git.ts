@@ -87,18 +87,19 @@ export async function createBranchAndPR(issue: Issue, prDescription?: string, cr
     gh(['pr', 'edit', String(existingPrNumber), '--body', body]);
     prUrl = `https://github.com/${config.owner}/${config.repo}/pull/${existingPrNumber}`;
   } else {
-    const result = ghJson<{ url: string }>([
+    const prResult = gh([
       'pr', 'create',
       '--title', issue.title,
       '--body', body,
       '--head', branchName,
       '--base', defaultBranch,
-      '--json', 'url',
     ]);
-    if (!result) {
-      throw new Error('Failed to create PR');
+    if (!prResult.success) {
+      throw new Error(`Failed to create PR: ${prResult.stderr}`);
     }
-    prUrl = result.url;
+    // Extract URL from output
+    const urlMatch = prResult.stdout.match(/https:\/\/github\.com\/[^\s]+/);
+    prUrl = urlMatch ? urlMatch[0] : `https://github.com/${config.owner}/${config.repo}/pulls`;
   }
 
   git('checkout', defaultBranch);
