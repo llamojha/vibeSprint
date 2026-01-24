@@ -1,7 +1,8 @@
 import { select, input } from '@inquirer/prompts';
 import { spawnSync } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { homedir } from 'os';
 import { addRepo, type RepoConfig } from '../config.js';
 
 interface Project {
@@ -44,26 +45,93 @@ async function selectColumn(
   return { id, name: selected.name };
 }
 
+async function selectPath(repoName: string): Promise<string | null> {
+  const home = homedir();
+  const commonDirs = ['Dev', 'Projects', 'Code', 'repos', 'src', 'work'].map(d => join(home, d));
+  const cwd = process.cwd();
+  
+  const choices: { name: string; value: string }[] = [];
+  
+  // Check current directory
+  if (existsSync(join(cwd, '.git'))) {
+    choices.push({ name: `${cwd} (current directory)`, value: cwd });
+  }
+  
+  // Auto-detect repo in common locations
+  for (const dir of commonDirs) {
+    if (!existsSync(dir)) continue;
+    const repoPath = join(dir, repoName);
+    if (existsSync(join(repoPath, '.git'))) {
+      choices.push({ name: `${repoPath} (detected)`, value: repoPath });
+    }
+  }
+  
+  // Browse current directory
+  if (!existsSync(join(cwd, '.git'))) {
+    choices.push({ name: `Browse ${cwd}`, value: `browse:${cwd}` });
+  }
+  
+  // Add common directories for browsing
+  for (const dir of commonDirs) {
+    if (existsSync(dir) && !choices.some(c => c.value.startsWith(dir))) {
+      choices.push({ name: `Browse ${dir}`, value: `browse:${dir}` });
+    }
+  }
+  
+  choices.push({ name: 'Enter path manually', value: 'manual' });
+  
+  const choice = await select({
+    message: 'Local path to repo clone:',
+    choices,
+  });
+  
+  if (choice === 'manual') {
+    const manualPath = await input({ message: 'Enter full path:' });
+    if (!existsSync(manualPath)) {
+      console.error(`\n\x1b[31m❌ ERROR: Path not found: ${manualPath}\x1b[0m`);
+      console.error('Please try again with a valid path.\n');
+      return null;
+    }
+    if (!existsSync(join(manualPath, '.git'))) {
+      console.error(`\n\x1b[31m❌ ERROR: Not a git repository: ${manualPath}\x1b[0m`);
+      console.error('Please try again with a valid git repository.\n');
+      return null;
+    }
+    return manualPath;
+  }
+  
+  if (choice.startsWith('browse:')) {
+    const dir = choice.replace('browse:', '');
+    const subdirs = readdirSync(dir, { withFileTypes: true })
+      .filter(d => d.isDirectory() && !d.name.startsWith('.'))
+      .map(d => join(dir, d.name))
+      .filter(p => existsSync(join(p, '.git')));
+    
+    if (subdirs.length === 0) {
+      console.error(`\n\x1b[31m❌ ERROR: No git repositories found in ${dir}\x1b[0m\n`);
+      return null;
+    }
+    
+    return await select({
+      message: 'Select repository:',
+      choices: subdirs.map(p => ({ name: p, value: p })),
+    });
+  }
+  
+  return choice;
+}
+
 export async function addRepoCommand(): Promise<void> {
   // Step 1: Basic info
   const owner = await input({ message: 'Repository owner (org or user):' });
   const repo = await input({ message: 'Repository name:' });
   const name = await input({ message: 'Friendly name for this repo:', default: repo });
-  const path = await input({ message: 'Local path to repo clone:' });
+  
+  // Step 2: Path selection
+  const path = await selectPath(repo);
+  if (!path) return;
 
-  if (!existsSync(path)) {
-    console.error(`\n\x1b[31m❌ ERROR: Path not found: ${path}\x1b[0m`);
-    console.error('Please try again with a valid path.\n');
-    return;
-  }
-
-  if (!existsSync(join(path, '.git'))) {
-    console.error(`\n\x1b[31m❌ ERROR: Not a git repository: ${path}\x1b[0m`);
-    console.error('Please try again with a valid git repository.\n');
-    return;
-  }
-
-  // Step 2: Select project
+  // Step 3: Select project
   const projectResult = spawnSync('gh', [
     'project', 'list', '--owner', owner, '--format', 'json',
   ], { encoding: 'utf-8' });
