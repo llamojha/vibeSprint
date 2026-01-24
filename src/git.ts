@@ -64,13 +64,23 @@ export async function createBranchAndPR(issue: Issue, prDescription?: string, cr
   }
 
   git('add', '-A');
+  
+  // Check if there are changes to commit
+  const status = spawnSync('git', ['status', '--porcelain'], { encoding: 'utf-8' });
+  if (!status.stdout.trim()) {
+    // No changes - check if PR already exists (kiro may have created it)
+    const existingPr = findExistingPR(branchName);
+    if (existingPr) {
+      git('checkout', defaultBranch);
+      return `https://github.com/${config.owner}/${config.repo}/pull/${existingPr}`;
+    }
+    throw new Error('No changes were made by kiro-cli. Check if the issue was already resolved or needs clearer instructions.');
+  }
+  
   try {
     git('commit', '-m', `feat: ${issue.title}\n\nRefs #${issue.number}`);
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    if (errorMsg.includes('nothing to commit')) {
-      throw new Error('No changes were made by kiro-cli. Check if the issue was already resolved or needs clearer instructions.');
-    }
     throw new Error(`Failed to commit changes: ${errorMsg}\n\nEnsure git user.name and user.email are configured:\n  git config --global user.name "Your Name"\n  git config --global user.email "your@email.com"`);
   }
 
