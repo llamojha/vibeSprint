@@ -175,6 +175,8 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
     return 'gray';
   };
 
+  const truncate = (s: string, len: number) => s.length > len ? s.slice(0, len - 1) + '…' : s;
+
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold>VibeSprint v{VERSION}</Text>
@@ -182,7 +184,7 @@ function Dashboard({ config, interval, verbose }: DashboardProps) {
       <Text> </Text>
 
       <Box flexDirection="row">
-        <Box flexDirection="column" width={25}>
+        <Box flexDirection="column">
           <Text bold>Repos ({config.repos.length})</Text>
           <Text>{'─'.repeat(20)}</Text>
           {repoStatuses.map((r, i) => (
