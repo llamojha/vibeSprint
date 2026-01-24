@@ -1,27 +1,29 @@
-import { loadConfig, type Config } from './config.js';
 import { GitHubProvider } from './providers/github.js';
 import type { IssueProvider, Issue } from './providers/types.js';
 
-function getProvider(): IssueProvider {
-  return new GitHubProvider();
+function getProvider(issue: Issue): IssueProvider {
+  if (!issue.repoConfig) {
+    throw new Error('Issue missing repoConfig');
+  }
+  return new GitHubProvider(issue.repoConfig);
 }
 
-export async function ensureLabelsExist(config: Config): Promise<void> {
-  const provider = getProvider();
+export async function ensureLabelsExist(issue: Issue): Promise<void> {
+  const provider = getProvider(issue);
   await provider.ensureLabelsExist();
 }
 
-export async function addLabel(config: Config, issue: Issue, label: string): Promise<void> {
-  const provider = getProvider();
+export async function addLabel(issue: Issue, label: string): Promise<void> {
+  const provider = getProvider(issue);
   await provider.addLabel(issue, label);
 }
 
-export async function removeLabel(config: Config, issue: Issue, label: string): Promise<void> {
-  const provider = getProvider();
+export async function removeLabel(issue: Issue, label: string): Promise<void> {
+  const provider = getProvider(issue);
   await provider.removeLabel(issue, label);
 }
 
-export async function postErrorComment(config: Config, issue: Issue, runId: string, exitCode: number, stdout: string, stderr: string): Promise<void> {
+export async function postErrorComment(issue: Issue, runId: string, exitCode: number, stdout: string, stderr: string): Promise<void> {
   const output = (stderr || stdout).slice(-2000);
   
   const body = `## ❌ VibeSprint Run Failed
@@ -38,21 +40,21 @@ ${output || 'No output captured'}
 
 </details>`;
 
-  const provider = getProvider();
+  const provider = getProvider(issue);
   await provider.postComment(issue, body);
 }
 
-export async function moveToInReview(config: Config, issue: Issue): Promise<void> {
-  const provider = getProvider();
+export async function moveToInReview(issue: Issue): Promise<void> {
+  const provider = getProvider(issue);
   await provider.moveToColumn(issue, 'inReview');
 }
 
-export async function moveToInProgress(config: Config, issue: Issue): Promise<void> {
-  const provider = getProvider();
+export async function moveToInProgress(issue: Issue): Promise<void> {
+  const provider = getProvider(issue);
   await provider.moveToColumn(issue, 'inProgress');
 }
 
-export async function postPlanComment(config: Config, issue: Issue, plan: string, taskCount: number): Promise<void> {
+export async function postPlanComment(issue: Issue, plan: string, taskCount: number): Promise<void> {
   const body = `## 📋 Plan Generated
 
 ${plan}
@@ -60,16 +62,15 @@ ${plan}
 ---
 *${taskCount} sub-issue(s) will be created in Backlog.*`;
 
-  const provider = getProvider();
+  const provider = getProvider(issue);
   await provider.postComment(issue, body);
 }
 
 export async function createSubIssueInBacklog(
-  config: Config,
   parentIssue: Issue,
   title: string,
   body: string
 ): Promise<{ id: number; number: number }> {
-  const provider = getProvider();
+  const provider = getProvider(parentIssue);
   return provider.createSubIssue(parentIssue, title, body);
 }

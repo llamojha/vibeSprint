@@ -1,5 +1,4 @@
 import { spawnSync } from 'child_process';
-import { loadConfig } from './config.js';
 import { gh, ghJson } from './utils/gh.js';
 import type { Issue } from './intake.js';
 
@@ -8,34 +7,50 @@ function slugify(text: string): string {
   return slug || 'issue';
 }
 
-function git(...args: string[]): string {
-  const result = spawnSync('git', args, { encoding: 'utf-8' });
+function gitInDir(cwd: string, ...args: string[]): string {
+  const result = spawnSync('git', args, { encoding: 'utf-8', cwd });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(result.stderr || `git ${args[0]} failed`);
   return result.stdout.trim();
 }
 
-function branchExists(branchName: string): boolean {
-  const result = spawnSync('git', ['rev-parse', '--verify', branchName], { encoding: 'utf-8' });
+function branchExistsInDir(cwd: string, branchName: string): boolean {
+  const result = spawnSync('git', ['rev-parse', '--verify', branchName], { encoding: 'utf-8', cwd });
   return result.status === 0;
 }
 
-function findExistingPR(branchName: string): number | null {
-  const result = ghJson<Array<{ number: number; headRefName: string }> | { pullRequests: Array<{ number: number }> }>([
-    'pr', 'list', '--head', branchName, '--state', 'open', '--json', 'number,headRefName',
-  ]);
+function findExistingPR(branchName: string, repoRef: { owner: string; repo: string }): number | null {
+  const result = ghJson<Array<{ number: number; headRefName: string }> | { pullRequests: Array<{ number: number }> }>(
+    ['pr', 'list', '--head', branchName, '--state', 'open', '--json', 'number,headRefName'],
+    repoRef
+  );
   const prs = Array.isArray(result) ? result : result?.pullRequests || [];
   return prs.length > 0 ? prs[0].number : null;
 }
 
 export async function createBranchAndPR(issue: Issue, prDescription?: string, credits?: number, timeSeconds?: number): Promise<string> {
-  const config = loadConfig();
+  if (!issue.repoConfig) {
+    throw new Error('Issue missing repoConfig');
+  }
+
+  const repo = issue.repoConfig;
+  const cwd = repo.path;
+  const repoRef = { owner: repo.owner, repo: repo.repo };
   const branchName = `agent/${issue.number}-${slugify(issue.title)}`;
 
-  const defaultBranch = git('rev-parse', '--abbrev-ref', 'HEAD');
+  const git = (...args: string[]) => gitInDir(cwd, ...args);
 
-  // Stash tracked changes only (exclude untracked files like .vibesprint)
-  const hasChanges = spawnSync('git', ['diff', '--quiet'], { encoding: 'utf-8' }).status !== 0;
+  // Get default branch from origin/HEAD
+  let defaultBranch = 'main';
+  try {
+    const ref = gitInDir(cwd, 'symbolic-ref', 'refs/remotes/origin/HEAD');
+    defaultBranch = ref.replace('refs/remotes/origin/', '');
+  } catch {
+    // Fallback to main if origin/HEAD not set
+  }
+
+  // Stash tracked changes
+  const hasChanges = spawnSync('git', ['diff', '--quiet'], { encoding: 'utf-8', cwd }).status !== 0;
   if (hasChanges) git('stash');
   git('pull', '--rebase', 'origin', defaultBranch);
   if (hasChanges) {
@@ -46,20 +61,19 @@ export async function createBranchAndPR(issue: Issue, prDescription?: string, cr
     }
   }
 
-  // Always create fresh branch from main
-  if (branchExists(branchName)) {
+  // Create branch
+  if (branchExistsInDir(cwd, branchName)) {
     git('checkout', defaultBranch);
     try {
       git('branch', '-D', branchName);
     } catch {
-      // Branch might be in use by worktree - ignore and reuse
+      // Branch might be in use by worktree
     }
   }
   
   // Use gh issue develop to link branch to issue
-  const develop = gh(['issue', 'develop', String(issue.number), '--name', branchName, '--checkout']);
+  const develop = gh(['issue', 'develop', String(issue.number), '--name', branchName, '--checkout'], repoRef);
   if (!develop.success) {
-    // Fallback to git checkout if gh issue develop fails
     try {
       git('checkout', '-b', branchName);
     } catch {
@@ -70,13 +84,12 @@ export async function createBranchAndPR(issue: Issue, prDescription?: string, cr
   git('add', '-A');
   
   // Check if there are changes to commit
-  const status = spawnSync('git', ['status', '--porcelain'], { encoding: 'utf-8' });
+  const status = spawnSync('git', ['status', '--porcelain'], { encoding: 'utf-8', cwd });
   if (!status.stdout.trim()) {
-    // No changes - check if PR already exists (kiro may have created it)
-    const existingPr = findExistingPR(branchName);
+    const existingPr = findExistingPR(branchName, repoRef);
     if (existingPr) {
       git('checkout', defaultBranch);
-      return `https://github.com/${config.owner}/${config.repo}/pull/${existingPr}`;
+      return `https://github.com/${repo.owner}/${repo.repo}/pull/${existingPr}`;
     }
     throw new Error('No changes were made by kiro-cli. Check if the issue was already resolved or needs clearer instructions.');
   }
@@ -93,13 +106,12 @@ export async function createBranchAndPR(issue: Issue, prDescription?: string, cr
   const creditsLine = credits !== undefined ? `\n\n---\n🤖 *Generated by VibeSprint* • Credits: ${credits} • Time: ${timeSeconds}s` : '';
   const body = (prDescription || `## Summary\n\n${issue.body || 'Auto-generated from issue.'}\n\nFixes #${issue.number}`) + creditsLine;
 
-  // Check for existing PR
-  const existingPrNumber = findExistingPR(branchName);
+  const existingPrNumber = findExistingPR(branchName, repoRef);
 
   let prUrl: string;
   if (existingPrNumber) {
-    gh(['pr', 'edit', String(existingPrNumber), '--body', body]);
-    prUrl = `https://github.com/${config.owner}/${config.repo}/pull/${existingPrNumber}`;
+    gh(['pr', 'edit', String(existingPrNumber), '--body', body], repoRef);
+    prUrl = `https://github.com/${repo.owner}/${repo.repo}/pull/${existingPrNumber}`;
   } else {
     const prResult = gh([
       'pr', 'create',
@@ -107,13 +119,12 @@ export async function createBranchAndPR(issue: Issue, prDescription?: string, cr
       '--body', body,
       '--head', branchName,
       '--base', defaultBranch,
-    ]);
+    ], repoRef);
     if (!prResult.success) {
       throw new Error(`Failed to create PR: ${prResult.stderr}`);
     }
-    // Extract URL from output
     const urlMatch = prResult.stdout.match(/https:\/\/github\.com\/[^\s]+/);
-    prUrl = urlMatch ? urlMatch[0] : `https://github.com/${config.owner}/${config.repo}/pulls`;
+    prUrl = urlMatch ? urlMatch[0] : `https://github.com/${repo.owner}/${repo.repo}/pulls`;
   }
 
   git('checkout', defaultBranch);

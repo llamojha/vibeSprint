@@ -1,4 +1,4 @@
-import { loadConfig, type Config } from '../config.js';
+import { type RepoConfig } from '../config.js';
 import { gh, ghJson, ghProject, ghProjectJson } from '../utils/gh.js';
 import type { IssueProvider, Issue } from './types.js';
 import type { ExecutorType } from '../executors/index.js';
@@ -25,35 +25,33 @@ interface ProjectItem {
 }
 
 export class GitHubProvider implements IssueProvider {
-  private config: Config;
+  private repo: RepoConfig;
 
-  constructor() {
-    this.config = loadConfig();
+  constructor(repoConfig: RepoConfig) {
+    this.repo = repoConfig;
+  }
+
+  private get repoRef() {
+    return { owner: this.repo.owner, repo: this.repo.repo };
   }
 
   async getIssues(): Promise<Issue[]> {
-    if (!this.config.projectNumber || !this.config.columnName) {
-      console.error('Error: Project not configured. Run `vibesprint config link` and `vibesprint config column`.');
-      process.exit(1);
-    }
-
     const result = ghProjectJson<{ items: ProjectItem[] } | ProjectItem[]>([
-      'item-list', String(this.config.projectNumber),
+      'item-list', String(this.repo.projectNumber),
       '--format', 'json',
-    ]);
+    ], this.repo.owner);
 
     if (!result) {
-      console.error('Error: Failed to fetch project items');
+      console.error(`Error: Failed to fetch project items for ${this.repo.name}`);
       return [];
     }
 
-    // Handle both { items: [...] } and direct array formats
     const items = Array.isArray(result) ? result : result.items || [];
 
     return items
       .filter(item => {
         if (!item.content || item.content.type !== 'Issue') return false;
-        if (item.status !== this.config.columnName) return false;
+        if (item.status !== this.repo.columnName) return false;
         const labels = item.labels || [];
         if (labels.includes('running') || labels.includes('done')) return false;
         if (labels.includes('failed') && !labels.includes('retry')) return false;
@@ -73,56 +71,51 @@ export class GitHubProvider implements IssueProvider {
           labels,
           model: modelLabel?.replace('model:', ''),
           executor: executorLabel?.replace('executor:', '') as ExecutorType | undefined,
+          repoConfig: this.repo,
         };
       })
       .sort((a, b) => a.number - b.number);
   }
 
   async addLabel(issue: Issue, label: string): Promise<void> {
-    const result = gh(['issue', 'edit', String(issue.number), '--add-label', label]);
+    const result = gh(['issue', 'edit', String(issue.number), '--add-label', label], this.repoRef);
     if (!result.success) {
       console.warn(`⚠️ Failed to add label '${label}': ${result.stderr}`);
     }
   }
 
   async removeLabel(issue: Issue, label: string): Promise<void> {
-    const result = gh(['issue', 'edit', String(issue.number), '--remove-label', label]);
+    const result = gh(['issue', 'edit', String(issue.number), '--remove-label', label], this.repoRef);
     if (!result.success && !result.stderr.includes('not found')) {
       console.warn(`⚠️ Failed to remove label '${label}': ${result.stderr}`);
     }
   }
 
   async postComment(issue: Issue, body: string): Promise<void> {
-    const result = gh(['issue', 'comment', String(issue.number), '--body', body]);
+    const result = gh(['issue', 'comment', String(issue.number), '--body', body], this.repoRef);
     if (!result.success) {
       console.warn(`⚠️ Failed to post comment: ${result.stderr}`);
     }
   }
 
   async moveToColumn(issue: Issue, column: 'backlog' | 'inProgress' | 'inReview'): Promise<void> {
-    const columnNameMap = {
-      backlog: this.config.backlogColumnName,
-      inProgress: this.config.inProgressColumnName,
-      inReview: this.config.inReviewColumnName,
-    };
-
-    const columnName = columnNameMap[column];
-    if (!columnName || !this.config.projectId) return;
+    const optionId = this.getColumnOptionId(column);
+    if (!optionId) return;
 
     ghProject([
       'item-edit',
       '--id', issue.projectItemId,
-      '--project-id', this.config.projectId,
-      '--field-id', this.config.columnFieldId!,
-      '--single-select-option-id', this.getColumnOptionId(column)!,
-    ], false);
+      '--project-id', this.repo.projectId,
+      '--field-id', this.repo.columnFieldId,
+      '--single-select-option-id', optionId,
+    ]);
   }
 
   private getColumnOptionId(column: 'backlog' | 'inProgress' | 'inReview'): string | undefined {
     const map = {
-      backlog: this.config.backlogOptionId,
-      inProgress: this.config.inProgressOptionId,
-      inReview: this.config.inReviewOptionId,
+      backlog: this.repo.backlogOptionId,
+      inProgress: this.repo.inProgressOptionId,
+      inReview: this.repo.inReviewOptionId,
     };
     return map[column];
   }
@@ -134,17 +127,12 @@ export class GitHubProvider implements IssueProvider {
   ): Promise<{ id: number; number: number }> {
     const fullBody = `${body}\n\n---\n*Part of #${parentIssue.number}*`;
     
-    const res = gh([
-      'issue', 'create',
-      '--title', title,
-      '--body', fullBody,
-    ]);
+    const res = gh(['issue', 'create', '--title', title, '--body', fullBody], this.repoRef);
 
     if (!res.success) {
       throw new Error(`Failed to create sub-issue: ${res.stderr}`);
     }
 
-    // Parse issue URL from output: https://github.com/owner/repo/issues/123
     const urlMatch = res.stdout.match(/https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/(\d+)/);
     if (!urlMatch) {
       throw new Error(`Failed to parse issue URL from: ${res.stdout}`);
@@ -152,25 +140,22 @@ export class GitHubProvider implements IssueProvider {
     const issueNumber = parseInt(urlMatch[1], 10);
     const issueUrl = urlMatch[0];
 
-    // Add to project
-    if (this.config.projectNumber) {
-      ghProject([
-        'item-add', String(this.config.projectNumber),
-        '--url', issueUrl,
-      ]);
-    }
+    ghProject(['item-add', String(this.repo.projectNumber), '--url', issueUrl], this.repo.owner);
 
     return { id: issueNumber, number: issueNumber };
   }
 
   async ensureLabelsExist(): Promise<void> {
-    const result = ghJson<Array<{ name: string }> | { labels: Array<{ name: string }> }>(['label', 'list', '--json', 'name']);
+    const result = ghJson<Array<{ name: string }> | { labels: Array<{ name: string }> }>(
+      ['label', 'list', '--json', 'name'],
+      this.repoRef
+    );
     const labels = Array.isArray(result) ? result : result?.labels || [];
     const existingNames = new Set(labels.map(l => l.name));
 
     for (const label of REQUIRED_LABELS) {
       if (!existingNames.has(label)) {
-        const createResult = gh(['label', 'create', label, '--color', 'ededed']);
+        const createResult = gh(['label', 'create', label, '--color', 'ededed'], this.repoRef);
         if (createResult.success) {
           console.log(`  📌 Created label: ${label}`);
         }

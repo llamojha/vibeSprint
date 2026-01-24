@@ -1,4 +1,5 @@
 import type { ExecutorType } from '../executors/index.js';
+import type { RepoConfig } from '../config.js';
 
 export interface Issue {
   id: string;
@@ -10,6 +11,7 @@ export interface Issue {
   labels: string[];
   model?: string;
   executor?: ExecutorType;
+  repoConfig?: RepoConfig;
 }
 
 export interface IssueProvider {

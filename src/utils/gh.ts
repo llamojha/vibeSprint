@@ -1,5 +1,4 @@
 import { spawnSync } from 'child_process';
-import { loadConfig } from '../config.js';
 
 export interface GhResult {
   success: boolean;
@@ -7,9 +6,13 @@ export interface GhResult {
   stderr: string;
 }
 
-export function gh(args: string[]): GhResult {
-  const config = loadConfig();
-  const repoArgs = config.owner && config.repo ? ['-R', `${config.owner}/${config.repo}`] : [];
+export interface RepoRef {
+  owner: string;
+  repo: string;
+}
+
+export function gh(args: string[], repoRef?: RepoRef): GhResult {
+  const repoArgs = repoRef ? ['-R', `${repoRef.owner}/${repoRef.repo}`] : [];
   const result = spawnSync('gh', [...repoArgs, ...args], { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
   return {
     success: result.status === 0,
@@ -18,8 +21,8 @@ export function gh(args: string[]): GhResult {
   };
 }
 
-export function ghJson<T>(args: string[]): T | null {
-  const result = gh(args);
+export function ghJson<T>(args: string[], repoRef?: RepoRef): T | null {
+  const result = gh(args, repoRef);
   if (!result.success) return null;
   try {
     return JSON.parse(result.stdout);
@@ -28,9 +31,8 @@ export function ghJson<T>(args: string[]): T | null {
   }
 }
 
-export function ghProject(args: string[], includeOwner = true): GhResult {
-  const config = loadConfig();
-  const ownerArgs = includeOwner && config.owner ? ['--owner', config.owner] : [];
+export function ghProject(args: string[], owner?: string): GhResult {
+  const ownerArgs = owner ? ['--owner', owner] : [];
   const result = spawnSync('gh', ['project', ...args, ...ownerArgs], { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
   return {
     success: result.status === 0,
@@ -39,8 +41,8 @@ export function ghProject(args: string[], includeOwner = true): GhResult {
   };
 }
 
-export function ghProjectJson<T>(args: string[]): T | null {
-  const result = ghProject(args);
+export function ghProjectJson<T>(args: string[], owner?: string): T | null {
+  const result = ghProject(args, owner);
   if (!result.success) return null;
   try {
     return JSON.parse(result.stdout);

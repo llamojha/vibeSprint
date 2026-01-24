@@ -15,6 +15,7 @@ export interface ExecutorOptions {
   model?: string;
   verbose?: boolean;
   timeout?: number;
+  cwd?: string;
 }
 
 export interface Executor {

@@ -57,7 +57,7 @@ export class CodexExecutor implements Executor {
 
       const child = spawn('codex', args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: process.cwd(),
+        cwd: options?.cwd || process.cwd(),
         env: { ...process.env },
       });
 

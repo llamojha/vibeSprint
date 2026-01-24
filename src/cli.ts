@@ -20,19 +20,27 @@ program
 const config = program.command('config').description('Configure VibeSprint settings');
 
 config
-  .command('link')
-  .description('Link to a GitHub Project')
+  .command('add-repo')
+  .description('Add a repository to monitor')
   .action(async () => {
-    const { link } = await import('./commands/link.js');
-    await link();
+    const { addRepoCommand } = await import('./commands/add-repo.js');
+    await addRepoCommand();
   });
 
 config
-  .command('column')
-  .description('Select column to monitor')
+  .command('list')
+  .description('List configured repositories')
   .action(async () => {
-    const { column } = await import('./commands/column.js');
-    await column();
+    const { listRepos } = await import('./commands/list-repos.js');
+    listRepos();
+  });
+
+config
+  .command('remove-repo <name>')
+  .description('Remove a repository')
+  .action(async (name: string) => {
+    const { removeRepoCommand } = await import('./commands/list-repos.js');
+    removeRepoCommand(name);
   });
 
 config
@@ -48,8 +56,8 @@ config
   .description('Show current configuration')
   .action(() => {
     const cfg = loadConfig();
-    if (Object.keys(cfg).length === 0) {
-      console.log('No configuration found. Run `vibesprint config link` to set up.');
+    if (cfg.repos.length === 0) {
+      console.log('No configuration found. Run `vibesprint config add-repo` to set up.');
     } else {
       console.log(JSON.stringify(cfg, null, 2));
     }
@@ -63,7 +71,9 @@ config
     const yes = await confirm({ message: 'Delete configuration and start fresh?' });
     if (yes) {
       const { unlinkSync, existsSync } = await import('fs');
-      const path = '.vibesprint';
+      const { join } = await import('path');
+      const { homedir } = await import('os');
+      const path = join(homedir(), '.vibesprint', 'config.json');
       if (existsSync(path)) {
         unlinkSync(path);
         console.log('Configuration deleted.');
@@ -85,11 +95,8 @@ program
     if (!isConfigComplete()) {
       console.log('📋 First-time setup required...\n');
       
-      const { link } = await import('./commands/link.js');
-      await link();
-      
-      const { column } = await import('./commands/column.js');
-      await column();
+      const { addRepoCommand } = await import('./commands/add-repo.js');
+      await addRepoCommand();
       
       // Model selection
       const cfg = loadConfig();

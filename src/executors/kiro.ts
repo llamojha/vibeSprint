@@ -57,7 +57,7 @@ export class KiroExecutor implements Executor {
 
       const child = spawn('kiro-cli', args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: process.cwd(),
+        cwd: options?.cwd || process.cwd(),
       });
 
       child.stdout.on('data', (data) => {
