@@ -56,11 +56,15 @@ export async function createBranchAndPR(issue: Issue, prDescription?: string, cr
     }
   }
   
-  try {
-    git('checkout', '-b', branchName);
-  } catch {
-    // Branch already exists (couldn't delete) - just checkout
-    git('checkout', branchName);
+  // Use gh issue develop to link branch to issue
+  const develop = gh(['issue', 'develop', String(issue.number), '--name', branchName, '--checkout']);
+  if (!develop.success) {
+    // Fallback to git checkout if gh issue develop fails
+    try {
+      git('checkout', '-b', branchName);
+    } catch {
+      git('checkout', branchName);
+    }
   }
 
   git('add', '-A');
