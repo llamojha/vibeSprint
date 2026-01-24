@@ -186,3 +186,57 @@ Added OpenAI Codex CLI as an alternative code generation backend to VibeSprint. 
 - gpt-5.2
 - gpt-5.1-codex-max
 - gpt-5.1-codex-mini
+
+---
+
+## multi-repo-support
+**Date**: 2026/1/24 12:04 - 15:57  
+**Duration**: 233 minutes  
+**Credits**: 169.83
+
+### Summary
+Major release adding multi-repo support, TUI dashboard with real-time status, daemon mode for background operation, and log capture to disk.
+
+### Changes
+
+#### Multi-Repo Support (v0.4.0)
+- Config moved to `~/.vibesprint/config.json` with `repos[]` array
+- Each repo has: name, owner, repo, path, projectId, projectNumber, column configs
+- Commands: `vibesprint config add-repo`, `list`, `remove-repo <name>`
+- GitHubProvider takes RepoConfig in constructor
+- Run loop iterates all repos sequentially
+
+#### TUI Menu (v0.4.1)
+- Main menu: Start, Repos, Executor, Model, Quit
+- Repos submenu: Add/remove/view repos
+- Auto-switch model when changing executor
+
+#### TUI Dashboard (v0.4.2)
+- Real-time dashboard with ink/React
+- Repos show status icons (○ idle, ◐ polling, ● processing)
+- Recent activity log with timestamps
+- Press `q` to quit, `d` to detach to daemon
+
+#### Daemon Mode
+- PID file at `~/.vibesprint/daemon.pid`, logs at `~/.vibesprint/daemon.log`
+- Press `d` in dashboard to detach (starts background daemon, exits TUI)
+- Menu shows daemon status, offers Stop Daemon option
+
+#### Log Capture & UX (v0.4.3)
+- Labels checked once per repo (saved in config)
+- Logs written to `~/.vibesprint/logs/<repo>-<issue>.log`
+- Current issue shown under repo: `└─ #19 Create docs...`
+- Arrow keys + Enter to view logs in dashboard
+- `+`/`-` to adjust polling interval live (10-300s)
+
+### Files Modified
+- `src/config.ts` - RepoConfig interface, central config
+- `src/cli.ts` - Menu → dashboard flow
+- `src/commands/menu.ts` - TUI menu with daemon status
+- `src/commands/add-repo.ts` - Interactive repo setup
+- `src/ui/dashboard.tsx` - Ink/React dashboard
+- `src/daemon.ts` - Daemon management
+- `src/issue-logs.ts` - Log file management (new)
+- `src/executors/types.ts` - Added onOutput callback
+- `src/executors/kiro.ts`, `src/executors/codex.ts` - Log streaming
+- `package.json` - v0.4.3
