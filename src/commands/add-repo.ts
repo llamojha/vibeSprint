@@ -52,13 +52,15 @@ export async function addRepoCommand(): Promise<void> {
   const path = await input({ message: 'Local path to repo clone:' });
 
   if (!existsSync(path)) {
-    console.error(`Error: Path not found: ${path}`);
-    process.exit(1);
+    console.error(`\n\x1b[31m❌ ERROR: Path not found: ${path}\x1b[0m`);
+    console.error('Please try again with a valid path.\n');
+    return;
   }
 
   if (!existsSync(join(path, '.git'))) {
-    console.error(`Error: Not a git repository: ${path}`);
-    process.exit(1);
+    console.error(`\n\x1b[31m❌ ERROR: Not a git repository: ${path}\x1b[0m`);
+    console.error('Please try again with a valid git repository.\n');
+    return;
   }
 
   // Step 2: Select project
@@ -67,8 +69,9 @@ export async function addRepoCommand(): Promise<void> {
   ], { encoding: 'utf-8' });
 
   if (projectResult.status !== 0) {
-    console.error('Failed to list projects:', projectResult.stderr);
-    process.exit(1);
+    console.error(`\n\x1b[31m❌ ERROR: Failed to list projects: ${projectResult.stderr}\x1b[0m`);
+    console.error('Please check your GitHub authentication and try again.\n');
+    return;
   }
 
   let projects: Project[];
@@ -76,13 +79,15 @@ export async function addRepoCommand(): Promise<void> {
     const parsed = JSON.parse(projectResult.stdout);
     projects = parsed.projects || parsed;
   } catch {
-    console.error('Failed to parse projects response');
-    process.exit(1);
+    console.error('\n\x1b[31m❌ ERROR: Failed to parse projects response.\x1b[0m');
+    console.error('Please try again.\n');
+    return;
   }
 
   if (!projects.length) {
-    console.error('No projects found for this owner.');
-    process.exit(1);
+    console.error('\n\x1b[31m❌ ERROR: No projects found for this owner.\x1b[0m');
+    console.error('Please create a GitHub Project first.\n');
+    return;
   }
 
   const projectNumber = await select({
@@ -98,8 +103,9 @@ export async function addRepoCommand(): Promise<void> {
   ], { encoding: 'utf-8' });
 
   if (fieldResult.status !== 0) {
-    console.error('Failed to list fields:', fieldResult.stderr);
-    process.exit(1);
+    console.error(`\n\x1b[31m❌ ERROR: Failed to list project fields: ${fieldResult.stderr}\x1b[0m`);
+    console.error('Please try again.\n');
+    return;
   }
 
   let fields: Field[];
@@ -107,14 +113,16 @@ export async function addRepoCommand(): Promise<void> {
     const parsed = JSON.parse(fieldResult.stdout);
     fields = parsed.fields || parsed;
   } catch {
-    console.error('Failed to parse fields response');
-    process.exit(1);
+    console.error('\n\x1b[31m❌ ERROR: Failed to parse fields response.\x1b[0m');
+    console.error('Please try again.\n');
+    return;
   }
 
   const statusField = fields.find(f => f.name === 'Status' && f.type === 'ProjectV2SingleSelectField');
   if (!statusField?.options || statusField.options.length < 4) {
-    console.error('Error: Project needs a Status field with at least 4 options.');
-    process.exit(1);
+    console.error('\n\x1b[31m❌ ERROR: Project needs a Status field with at least 4 options.\x1b[0m');
+    console.error('Please add Backlog, Ready, In Progress, and In Review columns.\n');
+    return;
   }
 
   const opts = statusField.options;
