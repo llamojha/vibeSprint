@@ -4,13 +4,11 @@
 
 A self-hosted CLI that monitors your GitHub Project board and automatically converts issues into production-ready pull requests using `kiro-cli` or OpenAI's `codex` CLI. No servers, no webhooks, no complexity — just `npm install` and run.
 
-📋 **Live Project Board**: [See it in action](https://github.com/users/llamojha/projects/7) • 🎥 **Demo Video**: [Watch the workflow](https://www.youtube.com/watch?v=qomajZkC1fU)
-
 ## Quick Start
 
 ```bash
 # 1. Install prerequisites
-# - Node.js 18+ (https://nodejs.org)
+# - Node.js 20+ (https://nodejs.org)
 # - GitHub CLI (https://cli.github.com)
 # - kiro-cli (https://kiro.dev/docs/cli/installation)
 
@@ -25,7 +23,7 @@ cd vibesprint && npm install && npm run build && npm link
 cd /path/to/your/project
 echo ".vibesprint" >> .gitignore
 
-# 5. Run (first time will prompt for project/column setup)
+# 5. Run (first time will prompt for project/column/model setup)
 vibesprint run
 ```
 
@@ -35,9 +33,9 @@ vibesprint run
 
 ### 1. Prerequisites
 
-**Node.js 18+**
+**Node.js 20+**
 - Download from [nodejs.org](https://nodejs.org)
-- Verify: `node --version` (should be 18.0.0 or higher)
+- Verify: `node --version` (should be 20.0.0 or higher)
 
 **GitHub CLI**
 - Install from [cli.github.com](https://cli.github.com)
@@ -104,7 +102,8 @@ vibesprint run
 The CLI will ask you to:
 1. **Link to a GitHub Project** - Select from your available projects
 2. **Choose columns** - Map your board columns to workflow states
-3. **Set polling interval** - How often to check for new issues (default: 60s)
+3. **Select model** - Choose AI model for code generation (kiro-cli only)
+4. **Set polling interval** - How often to check for new issues (default: 60s)
 
 ### 6. Test the Setup
 
@@ -117,9 +116,9 @@ The CLI will ask you to:
 
 - **🎯 Issue → PR in minutes**: Drop an issue in your "Ready" column, get a complete PR with code, tests, and documentation
 - **🧠 Smart planning**: Add a `plan` label to break complex features into manageable sub-issues automatically  
-- **⚡ Parallel execution**: Uses Kiro's subagent system to handle multiple tasks simultaneously
+- **⚡ Multiple AI models**: Choose from Claude Sonnet, Haiku, Opus, or auto-selection for optimal results
 - **🔒 Fully local**: Runs on your machine with your credentials — no cloud dependencies
-- **🎨 Workflow innovation**: 30+ custom Kiro prompts for debugging, planning, and code review
+- **🎛️ Flexible executors**: Switch between kiro-cli and codex for different workflows
 
 ## How It Works
 
@@ -163,12 +162,12 @@ Press `Ctrl+C` to stop.
 |---------|-------------|
 | `vibesprint config link` | Link to a GitHub Project |
 | `vibesprint config column` | Select columns to use |
-| `vibesprint config executor` | Select code generation backend (kiro or codex) |
+| `vibesprint config executor [type]` | Select code generation backend (kiro or codex) |
 | `vibesprint config show` | Show current configuration |
 | `vibesprint config reset` | Reset configuration |
 | `vibesprint run` | Start polling and processing |
 | `vibesprint run --dry-run` | Show issues without processing |
-| `vibesprint run --interval <s>` | Set polling interval (default: 60s) |
+| `vibesprint run --interval <seconds>` | Set polling interval (default: 60s) |
 | `vibesprint run --verbose` | Show detailed output |
 | `vibesprint run --executor <type>` | Override executor (kiro or codex) |
 
@@ -215,11 +214,14 @@ vibesprint run --interval 30
 | Label | Meaning |
 |-------|---------|
 | `plan` | Trigger plan workflow instead of implement |
+| `no-curate` | Skip context curation for faster processing |
 | `running` | Currently being processed |
 | `pr-opened` | PR was created successfully |
 | `plan-posted` | Plan generated, sub-issues created |
 | `retry` | Failed once, will retry |
 | `failed` | Failed twice, needs manual intervention |
+| `model:*` | Override model selection (e.g., `model:claude-sonnet-4.5`) |
+| `executor:*` | Override executor (e.g., `executor:codex`) |
 
 ## Configuration
 
@@ -231,6 +233,15 @@ vibesprint config link
 
 # Reconfigure columns
 vibesprint config column
+
+# Change executor (kiro or codex)
+vibesprint config executor
+
+# View current settings
+vibesprint config show
+
+# Reset all configuration
+vibesprint config reset
 ```
 
 ## Troubleshooting
@@ -243,6 +254,9 @@ vibesprint config column
 | `Config file lost` | Add `.vibesprint` to `.gitignore` |
 | `kiro-cli not found` | Install kiro-cli: https://kiro.dev/docs/cli/installation |
 | `codex not found` | Install: `npm install -g @openai/codex` |
+| `Model selection failed` | Ensure kiro-cli is authenticated and working |
+| `Permission denied` | Check GitHub CLI authentication: `gh auth status` |
+| `Project items not found` | Verify project number and column configuration |
 
 ## Project Structure
 
@@ -260,11 +274,16 @@ src/
 │   ├── link.ts      # Project linking
 │   ├── column.ts    # Column selection
 │   └── executor.ts  # Executor selection
-└── executors/
-    ├── types.ts     # Executor interface
-    ├── kiro.ts      # Kiro CLI executor
-    ├── codex.ts     # OpenAI Codex executor
-    └── index.ts     # Factory and exports
+├── executors/
+│   ├── types.ts     # Executor interface
+│   ├── kiro.ts      # Kiro CLI executor
+│   ├── codex.ts     # OpenAI Codex executor
+│   └── index.ts     # Factory and exports
+├── providers/
+│   ├── types.ts     # Provider interface
+│   └── github.ts    # GitHub API provider
+└── utils/
+    └── gh.ts        # GitHub CLI utilities
 ```
 
 ## License
