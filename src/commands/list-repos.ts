@@ -10,11 +10,20 @@ export function listRepos(): void {
 
   console.log('Configured repositories:\n');
   for (const repo of config.repos) {
-    console.log(`  ${repo.name}`);
+    const provider = repo.provider || 'github';
+    console.log(`  ${repo.name} [${provider}]`);
     console.log(`    Repo: ${repo.owner}/${repo.repo}`);
     console.log(`    Path: ${repo.path}`);
-    console.log(`    Project: #${repo.projectNumber}`);
-    console.log(`    Ready column: ${repo.columnName}`);
+    
+    if (provider === 'linear') {
+      console.log(`    Team: ${repo.linearTeamName || repo.linearTeamId}`);
+      if (repo.linearRepoLabel) {
+        console.log(`    Repo label: ${repo.linearRepoLabel}`);
+      }
+    } else {
+      console.log(`    Project: #${repo.projectNumber}`);
+      console.log(`    Ready column: ${repo.columnName}`);
+    }
     console.log('');
   }
 }

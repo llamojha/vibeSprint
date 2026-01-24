@@ -53,15 +53,41 @@ vibesprint run
 - Verify: `codex --version`
 - Authenticate: `codex login`
 
-### 2. GitHub Authentication
+### 2. Provider Authentication
 
-VibeSprint uses the GitHub CLI (`gh`) for all GitHub operations. Just run:
+VibeSprint supports two issue tracking providers: **GitHub Projects** (default) and **Linear**.
+
+#### GitHub Projects
+
+VibeSprint uses the GitHub CLI (`gh`) for all GitHub operations:
 
 ```bash
+# Basic authentication
 gh auth login
+
+# Add GitHub Projects scope (required for project board access)
+gh auth refresh -s project
 ```
 
-Follow the prompts to authenticate. That's it - no tokens to manage!
+#### Linear (Alternative)
+
+To use Linear as your issue source instead of GitHub Projects:
+
+1. **Enable Linear GitHub Integration** (required for PR linking)
+   - Go to Linear Settings → Integrations → GitHub
+   - Connect your GitHub organization/repos
+   - This allows VibeSprint to link PRs to Linear issues
+
+2. **Create a Linear API Key**
+   - Go to Linear Settings → API → Personal API keys
+   - Create a new key with read/write access
+   - Set as environment variable: `export LINEAR_API_KEY=lin_api_...`
+   - Or configure via CLI during `vibesprint config add-repo --linear`
+
+3. **Configure a repo with Linear**
+   ```bash
+   vibesprint config add-repo --linear
+   ```
 
 ### 3. GitHub Project Board Setup
 

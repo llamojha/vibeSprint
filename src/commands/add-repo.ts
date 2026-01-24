@@ -1,9 +1,10 @@
-import { select, input } from '@inquirer/prompts';
+import { select, input, confirm } from '@inquirer/prompts';
 import { spawnSync } from 'child_process';
 import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { addRepo, type RepoConfig } from '../config.js';
+import { LinearClient, type Team, type WorkflowState } from '@linear/sdk';
+import { addRepo, getLinearApiKey, loadConfig, saveConfig, type RepoConfig } from '../config.js';
 
 interface Project {
   number: number;
@@ -121,7 +122,101 @@ async function selectPath(repoName: string): Promise<string | null> {
   return choice;
 }
 
-export async function addRepoCommand(): Promise<void> {
+async function addLinearRepo(): Promise<void> {
+  // Step 1: Get API key
+  let apiKey = getLinearApiKey();
+  if (!apiKey) {
+    console.log('\n📋 Linear API key not found in environment.');
+    apiKey = await input({ message: 'Enter your Linear API key:' });
+    
+    const saveKey = await confirm({ message: 'Save API key to config? (Otherwise set LINEAR_API_KEY env var)', default: false });
+    if (saveKey) {
+      const config = loadConfig();
+      config.linearApiKey = apiKey;
+      saveConfig(config);
+    }
+  }
+
+  const client = new LinearClient({ apiKey });
+
+  // Validate API key
+  try {
+    await client.viewer;
+  } catch {
+    console.error('\n\x1b[31m❌ ERROR: Invalid Linear API key.\x1b[0m\n');
+    return;
+  }
+
+  // Step 2: Select team
+  const teams = await client.teams();
+  if (teams.nodes.length === 0) {
+    console.error('\n\x1b[31m❌ ERROR: No teams found in your Linear workspace.\x1b[0m\n');
+    return;
+  }
+
+  const teamId = await select({
+    message: 'Select Linear team:',
+    choices: teams.nodes.map((t: Team) => ({ name: t.name, value: t.id })),
+  });
+  const selectedTeam = teams.nodes.find((t: Team) => t.id === teamId)!;
+
+  // Step 3: Map workflow states
+  const states = await selectedTeam.states();
+  const stateChoices = states.nodes.map((s: WorkflowState) => ({ name: `${s.name} (${s.type})`, value: s.id }));
+
+  const readyStateId = await select({ message: 'Select "Ready" state (monitored):', choices: stateChoices }) as string;
+  const inProgressStateId = await select({ message: 'Select "In Progress" state:', choices: stateChoices }) as string;
+  const inReviewStateId = await select({ message: 'Select "In Review" state:', choices: stateChoices }) as string;
+  const backlogStateId = await select({ message: 'Select "Backlog" state:', choices: stateChoices }) as string;
+
+  // Step 4: GitHub repo info (for PRs)
+  console.log('\n📦 GitHub repository (where PRs will be created):');
+  const owner = await input({ message: 'Repository owner (org or user):' });
+  const repo = await input({ message: 'Repository name:' });
+  const name = await input({ message: 'Friendly name for this config:', default: repo });
+
+  // Step 5: Repo label for shared teams
+  let linearRepoLabel: string | undefined;
+  const isSharedTeam = await confirm({ message: 'Is this team shared across multiple GitHub repos?', default: false });
+  if (isSharedTeam) {
+    linearRepoLabel = await input({ message: 'Label to filter issues for this repo:', default: `repo:${repo}` });
+  }
+
+  // Step 6: Local path
+  const path = await selectPath(repo);
+  if (!path) return;
+
+  // Step 7: Save config
+  const repoConfig: RepoConfig = {
+    name,
+    owner,
+    repo,
+    path,
+    provider: 'linear',
+    linearTeamId: teamId as string,
+    linearTeamName: selectedTeam.name,
+    linearRepoLabel,
+    linearReadyStateId: readyStateId,
+    linearInProgressStateId: inProgressStateId,
+    linearInReviewStateId: inReviewStateId,
+    linearBacklogStateId: backlogStateId,
+  };
+
+  addRepo(repoConfig);
+  console.log(`\n✅ Added Linear repo: ${name} (${selectedTeam.name} → ${owner}/${repo})`);
+
+  // Step 8: Create labels
+  console.log('🏷️ Creating VibeSprint labels in Linear...');
+  const { LinearProvider } = await import('../providers/linear.js');
+  const provider = new LinearProvider(repoConfig);
+  await provider.ensureLabelsExist();
+}
+
+export async function addRepoCommand(options: { linear?: boolean } = {}): Promise<void> {
+  if (options.linear) {
+    return addLinearRepo();
+  }
+
   // Step 1: Basic info
   const owner = await input({ message: 'Repository owner (org or user):' });
   const repo = await input({ message: 'Repository name:' });
@@ -205,6 +300,7 @@ export async function addRepoCommand(): Promise<void> {
     owner,
     repo,
     path,
+    provider: 'github',
     projectId: selectedProject.id,
     projectNumber: selectedProject.number,
     columnFieldId: statusField.id,

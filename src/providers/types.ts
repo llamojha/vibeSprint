@@ -4,6 +4,7 @@ import type { RepoConfig } from '../config.js';
 export interface Issue {
   id: string;
   number: number;
+  identifier?: string; // Linear identifier (e.g., "ENG-123")
   title: string;
   body: string;
   url: string;

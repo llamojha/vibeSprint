@@ -8,18 +8,32 @@ export interface RepoConfig {
   owner: string;
   repo: string;
   path: string;
-  projectId: string;
-  projectNumber: number;
-  columnFieldId: string;
-  columnOptionId: string;
-  columnName: string;
-  backlogOptionId: string;
-  backlogColumnName: string;
-  inProgressOptionId: string;
-  inProgressColumnName: string;
-  inReviewOptionId: string;
-  inReviewColumnName: string;
+  
+  // Provider type
+  provider?: 'github' | 'linear';
+  
+  // GitHub Projects fields
+  projectId?: string;
+  projectNumber?: number;
+  columnFieldId?: string;
+  columnOptionId?: string;
+  columnName?: string;
+  backlogOptionId?: string;
+  backlogColumnName?: string;
+  inProgressOptionId?: string;
+  inProgressColumnName?: string;
+  inReviewOptionId?: string;
+  inReviewColumnName?: string;
   labelsChecked?: boolean;
+  
+  // Linear fields
+  linearTeamId?: string;
+  linearTeamName?: string;
+  linearRepoLabel?: string;
+  linearReadyStateId?: string;
+  linearInProgressStateId?: string;
+  linearInReviewStateId?: string;
+  linearBacklogStateId?: string;
 }
 
 export interface Config {
@@ -28,6 +42,7 @@ export interface Config {
   model?: string;
   executor?: ExecutorType;
   codexModel?: string;
+  linearApiKey?: string;
 }
 
 export { KIRO_MODELS as AVAILABLE_MODELS, CODEX_MODELS } from './executors/index.js';
@@ -39,6 +54,10 @@ function ensureConfigDir(): void {
   if (!existsSync(CONFIG_DIR)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
   }
+}
+
+export function getLinearApiKey(): string | undefined {
+  return process.env.LINEAR_API_KEY || loadConfig().linearApiKey;
 }
 
 export function loadConfig(): Config {
@@ -101,8 +120,17 @@ export function validateConfig(): { valid: boolean; errors: string[] } {
   }
   
   for (const repo of config.repos) {
-    if (!repo.projectNumber) errors.push(`${repo.name}: Missing project`);
-    if (!repo.columnName) errors.push(`${repo.name}: Missing column`);
+    const provider = repo.provider || 'github';
+    
+    if (provider === 'github') {
+      if (!repo.projectNumber) errors.push(`${repo.name}: Missing project`);
+      if (!repo.columnName) errors.push(`${repo.name}: Missing column`);
+    } else if (provider === 'linear') {
+      if (!repo.linearTeamId) errors.push(`${repo.name}: Missing Linear team`);
+      if (!repo.linearReadyStateId) errors.push(`${repo.name}: Missing Linear Ready state`);
+      if (!getLinearApiKey()) errors.push(`${repo.name}: Missing LINEAR_API_KEY`);
+    }
+    
     if (!existsSync(repo.path)) errors.push(`${repo.name}: Path not found: ${repo.path}`);
   }
   

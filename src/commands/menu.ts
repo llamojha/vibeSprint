@@ -91,7 +91,11 @@ async function reposMenu(): Promise<void> {
 
     const choices = [
       { name: '+ Add new repo', value: 'add' },
-      ...config.repos.map(r => ({ name: `${r.name} (${r.owner}/${r.repo})`, value: r.name })),
+      ...config.repos.map(r => {
+        const provider = r.provider || 'github';
+        const providerTag = provider === 'linear' ? '[Linear]' : '[GitHub]';
+        return { name: `${r.name} ${providerTag} (${r.owner}/${r.repo})`, value: r.name };
+      }),
       { name: '← Back', value: 'back' },
     ];
 
@@ -105,7 +109,14 @@ async function reposMenu(): Promise<void> {
     }
 
     if (choice === 'add') {
-      await addRepoCommand();
+      const providerChoice = await select({
+        message: 'Issue source:',
+        choices: [
+          { name: 'GitHub Projects', value: 'github' },
+          { name: 'Linear', value: 'linear' },
+        ],
+      });
+      await addRepoCommand({ linear: providerChoice === 'linear' });
       continue;
     }
 
@@ -118,10 +129,22 @@ async function repoDetailMenu(repoName: string): Promise<void> {
   const repo = config.repos.find(r => r.name === repoName);
   if (!repo) return;
 
+  const provider = repo.provider || 'github';
+  
   console.log(`\n${repo.name}`);
+  console.log(`  Provider: ${provider}`);
   console.log(`  Path: ${repo.path}`);
-  console.log(`  Project: #${repo.projectNumber}`);
-  console.log(`  Ready column: ${repo.columnName}\n`);
+  
+  if (provider === 'linear') {
+    console.log(`  Team: ${repo.linearTeamName || repo.linearTeamId}`);
+    if (repo.linearRepoLabel) {
+      console.log(`  Repo label: ${repo.linearRepoLabel}`);
+    }
+  } else {
+    console.log(`  Project: #${repo.projectNumber}`);
+    console.log(`  Ready column: ${repo.columnName}`);
+  }
+  console.log();
 
   const action = await select({
     message: 'Action:',

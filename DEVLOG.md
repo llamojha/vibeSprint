@@ -7,3 +7,4 @@ codex-cli-integration, start: 2026/1/22 17:00 end: 2026/1/22 22:00 timeworked: 3
 
 gh-migration, start: 2026/1/23 22:33 end: 2026/1/23 23:40 timeworked: 67 minutes Credits: 65.69 Comment: Migrate from Octokit to gh CLI
 multi-repo-support, start: 2026/1/24 12:04 end: 2026/1/24 15:57 timeworked: 233 minutes Credits: 169.83 Comment: Multi-repo config, TUI dashboard with ink/React, daemon mode, log capture to disk
+linear-integration, start: 2026/1/24 17:16 credits_start: 1665.12

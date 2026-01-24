@@ -36,6 +36,10 @@ export class GitHubProvider implements IssueProvider {
   }
 
   async getIssues(): Promise<Issue[]> {
+    if (!this.repo.projectNumber) {
+      return [];
+    }
+    
     const result = ghProjectJson<{ items: ProjectItem[] } | ProjectItem[]>([
       'item-list', String(this.repo.projectNumber),
       '--format', 'json',
@@ -100,7 +104,7 @@ export class GitHubProvider implements IssueProvider {
 
   async moveToColumn(issue: Issue, column: 'backlog' | 'inProgress' | 'inReview'): Promise<void> {
     const optionId = this.getColumnOptionId(column);
-    if (!optionId) return;
+    if (!optionId || !this.repo.projectId || !this.repo.columnFieldId) return;
 
     ghProject([
       'item-edit',

@@ -1,11 +1,11 @@
-import { GitHubProvider } from './providers/github.js';
+import { createProvider } from './providers/index.js';
 import type { IssueProvider, Issue } from './providers/types.js';
 
 function getProvider(issue: Issue): IssueProvider {
   if (!issue.repoConfig) {
     throw new Error('Issue missing repoConfig');
   }
-  return new GitHubProvider(issue.repoConfig);
+  return createProvider(issue.repoConfig);
 }
 
 export async function ensureLabelsExist(issue: Issue): Promise<void> {

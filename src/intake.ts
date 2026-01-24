@@ -1,5 +1,5 @@
 import { loadConfig } from './config.js';
-import { GitHubProvider } from './providers/github.js';
+import { createProvider } from './providers/index.js';
 import type { Issue } from './providers/types.js';
 
 export type { Issue };
@@ -9,7 +9,7 @@ export async function getIssuesInColumn(): Promise<Issue[]> {
   const allIssues: Issue[] = [];
 
   for (const repoConfig of config.repos) {
-    const provider = new GitHubProvider(repoConfig);
+    const provider = createProvider(repoConfig);
     const issues = await provider.getIssues();
     allIssues.push(...issues);
   }
@@ -23,7 +23,7 @@ export async function ensureAllLabelsExist(): Promise<void> {
   const config = loadConfig();
   for (const repoConfig of config.repos) {
     console.log(`  📦 ${repoConfig.name}...`);
-    const provider = new GitHubProvider(repoConfig);
+    const provider = createProvider(repoConfig);
     await provider.ensureLabelsExist();
   }
 }

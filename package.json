@@ -1,6 +1,6 @@
 {
   "name": "vibesprint",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "GitHub-driven local automation for issue-to-PR workflows",
   "type": "module",
   "author": "llamojha",
@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^7.0.0",
+    "@linear/sdk": "^29.0.0",
     "commander": "^12.0.0",
     "ink": "^6.6.0",
     "react": "^19.2.3"

@@ -79,9 +79,10 @@ const config = program.command('config').description('Configure VibeSprint');
 config
   .command('add-repo')
   .description('Add a repository')
-  .action(async () => {
+  .option('--linear', 'Use Linear as issue source instead of GitHub Projects')
+  .action(async (options: { linear?: boolean }) => {
     const { addRepoCommand } = await import('./commands/add-repo.js');
-    await addRepoCommand();
+    await addRepoCommand(options);
   });
 
 config
