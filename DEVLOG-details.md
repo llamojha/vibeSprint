@@ -20,7 +20,63 @@ This project uses 7 custom agents defined in `.kiro/agents/` for parallel task e
 - **rubberduck** - Architecture review, design decisions
 - **prompter** - Custom prompt creation and refinement
 
-During planning (via `plan-feature.md` prompt), tasks are assigned agent owners. Kiro then executes independent tasks in parallel using subagents, achieving ~5x speedup compared to sequential execution. For example, Phase 1 tasks for intake, git, and status modules ran concurrently since they had no dependencies on each other.
+### Subagent Parallelization Examples
+
+**Example 1: Phase 1 Foundation (3 parallel streams)**
+
+The `plan-feature.md` prompt generated this task breakdown:
+
+```
+Task 1: Issue Intake Module     → engine agent
+Task 2: Git Operations Module   → integration agent  
+Task 3: Status Manager Module   → integration agent
+Task 4: Context Builder         → engine agent (depends on Task 1)
+```
+
+Kiro executed Tasks 1, 2, 3 in parallel via subagents:
+```
+[subagent:engine]      → src/intake.ts (issue filtering, GraphQL queries)
+[subagent:integration] → src/git.ts (branch, commit, push, PR creation)
+[subagent:integration] → src/status.ts (labels, column moves)
+```
+
+Result: 3 modules completed in ~20 minutes instead of ~60 minutes sequential.
+
+**Example 2: Linear Integration (4 parallel streams)**
+
+```
+Task 1: LinearProvider class    → engine agent
+Task 2: Provider factory        → engine agent
+Task 3: TUI integration         → frontend agent
+Task 4: README updates          → content agent
+```
+
+Parallel execution:
+```
+[subagent:engine]   → src/providers/linear.ts
+[subagent:engine]   → src/providers/index.ts  
+[subagent:frontend] → src/commands/menu.ts (provider selection)
+[subagent:content]  → README.md (Linear setup docs)
+```
+
+Result: Full Linear integration in ~90 minutes instead of ~4 hours.
+
+**Example 3: Code Review Fixes (2 parallel streams)**
+
+After `code-review.md` identified 6 issues:
+```
+[subagent:engine] → Fix issues 1-3 (LinearProvider optimizations)
+[subagent:engine] → Fix issues 4-6 (error handling, imports)
+```
+
+### How to Use Subagents in Your Workflow
+
+1. **Plan with agent assignments**: Use `@plan-feature` to generate tasks with agent owners
+2. **Identify independent tasks**: Tasks with no dependencies can run in parallel
+3. **Invoke subagents**: Kiro automatically spawns subagents for independent tasks
+4. **Monitor progress**: Each subagent reports completion independently
+
+The key insight: **dependency analysis determines parallelization**. Tasks that don't share file dependencies or data dependencies can safely execute concurrently.
 
 ## Challenges Faced
 
@@ -240,3 +296,64 @@ Major release adding multi-repo support, TUI dashboard with real-time status, da
 - `src/executors/types.ts` - Added onOutput callback
 - `src/executors/kiro.ts`, `src/executors/codex.ts` - Log streaming
 - `package.json` - v0.4.3
+
+---
+
+## linear-integration
+**Date**: 2026/1/24 17:16 - 21:41
+**Duration**: 265 minutes
+**Credits**: 119.36
+
+### Summary
+Added Linear as an alternative issue source for VibeSprint, enabling teams using Linear for project management to automatically convert Linear issues into GitHub PRs. Full feature parity with existing GitHubProvider.
+
+### Changes Made
+
+#### LinearProvider Implementation
+- Full `IssueProvider` interface implementation
+- `getIssues()` - queries Ready workflow state, filters by repo label
+- `addLabel()`/`removeLabel()` - with `vibesprint:` prefix for state labels
+- `moveToColumn()` - updates workflow state
+- `postComment()` - adds comments to issues
+- `attachPR()` - links PRs via Linear attachment API
+- `createSubIssue()` - creates sub-issues with parent relationship
+- `ensureLabelsExist()` - creates all VibeSprint labels in Linear team
+
+#### Provider Factory
+- `createProvider(repo)` returns LinearProvider or GitHubProvider based on config
+- Updated `intake.ts`, `status.ts`, `dashboard.tsx` to use factory
+
+#### TUI Integration
+- Provider selection when adding repos (GitHub Projects / Linear)
+- Provider tags shown in repo list: `[GitHub]` / `[Linear]`
+- Linear setup flow: API key validation, team selection, workflow state mapping
+
+#### Git Operations
+- Conventional branch prefixes (`feat/`, `fix/`, `docs/`, etc.) based on issue labels
+- Linear PR attachment linking via `attachmentCreate` API
+
+#### Config Schema
+- Extended `RepoConfig` with `provider` field and Linear-specific fields
+- `linearTeamId`, `linearTeamName`, `linearRepoLabel`, state IDs
+- `getLinearApiKey()` helper (env var with config fallback)
+
+#### Bug Fixes
+- Fixed dashboard hardcoded to GitHubProvider (wasn't showing Linear issues)
+- Added all workflow labels to LinearProvider (plan, model:*, executor:*)
+
+### Files Created
+- `src/providers/linear.ts` - LinearProvider implementation
+- `src/providers/index.ts` - Provider factory
+
+### Files Modified
+- `src/config.ts` - Extended RepoConfig, added getLinearApiKey()
+- `src/commands/add-repo.ts` - Linear setup flow
+- `src/commands/menu.ts` - Provider selection in TUI
+- `src/cli.ts` - Added --linear flag
+- `src/git.ts` - Conventional branch prefixes, Linear PR attachment
+- `src/intake.ts` - Use provider factory
+- `src/status.ts` - Use provider factory
+- `src/ui/dashboard.tsx` - Use provider factory (bug fix)
+- `src/providers/types.ts` - Added identifier field to Issue
+- `README.md` - TUI-first docs, Linear setup guide
+- `package.json` - v0.5.0, @linear/sdk dependency

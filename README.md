@@ -4,7 +4,10 @@
 
 A self-hosted CLI that monitors your GitHub Project board or Linear workspace and automatically converts issues into production-ready pull requests using `kiro-cli` or OpenAI's `codex` CLI. No servers, no webhooks, no complexity — just `npm install` and run.
 
-📋 **Live Project Board**: [See it in action](https://github.com/users/llamojha/projects/7) • 🎥 **Demo Video**: [Watch the workflow](https://www.youtube.com/watch?v=qomajZkC1fU)
+📋 **Live Project Board**: [See it in action](https://github.com/users/llamojha/projects/7) • 🎥 **Demo Video**: [Watch the workflow](https://youtu.be/K3-sSUJcGT8)
+
+![VibeSprint Dashboard](docs/assets/dashboard.gif)
+<!-- To add: Record a GIF showing the TUI dashboard with repos polling and processing an issue -->
 
 ## Quick Start
 
@@ -150,6 +153,23 @@ vibesprint run --verbose    # Show executor commands
 - **🔒 Fully local**: Runs on your machine with your credentials — no cloud dependencies
 - **🎨 Workflow innovation**: 30+ custom Kiro prompts for debugging, planning, and code review
 
+## Why VibeSprint?
+
+| Feature | VibeSprint | GitHub Copilot Workspace | Devin | Cursor |
+|---------|------------|-------------------------|-------|--------|
+| Self-hosted | ✅ Local CLI | ❌ Cloud | ❌ Cloud | ❌ Cloud |
+| Issue-driven | ✅ GitHub/Linear | ✅ GitHub only | ❌ Chat-based | ❌ Editor-based |
+| Plan workflow | ✅ Auto sub-issues | ❌ | ✅ | ❌ |
+| No subscription | ✅ BYO API keys | ❌ $19/mo | ❌ $500/mo | ❌ $20/mo |
+| Multi-repo | ✅ | ❌ | ✅ | ❌ |
+| Custom prompts | ✅ 30+ prompts | ❌ | ❌ | Limited |
+
+**VibeSprint is for developers who want:**
+- Full control over their automation (no cloud lock-in)
+- Issue-driven workflow (not chat-based)
+- Transparent AI operations (see exactly what's happening)
+- Flexibility to use any AI backend (Kiro, Codex, or add your own)
+
 ## How It Works
 
 ### Implement Flow (default)
@@ -277,23 +297,34 @@ vibesprint config column
 
 ```
 src/
-├── cli.ts           # CLI entry point
-├── config.ts        # Configuration management
-├── context.ts       # Build prompts for kiro-cli
-├── git.ts           # Git operations (branch, commit, PR)
-├── intake.ts        # Fetch issues from project board
-├── run.ts           # Main polling loop
-├── status.ts        # Labels, comments, column updates
-├── utils.ts         # Utilities (ANSI stripping)
+├── cli.ts              # CLI entry point and command routing
+├── config.ts           # Configuration management (multi-repo, providers)
+├── context.ts          # Build prompts for kiro-cli/codex
+├── git.ts              # Git operations (branch, commit, PR)
+├── intake.ts           # Issue fetching orchestration
+├── run.ts              # Main polling loop
+├── status.ts           # Labels, comments, column updates
+├── daemon.ts           # Background daemon management
+├── issue-logs.ts       # Per-issue log file management
 ├── commands/
-│   ├── link.ts      # Project linking
-│   ├── column.ts    # Column selection
-│   └── executor.ts  # Executor selection
-└── executors/
-    ├── types.ts     # Executor interface
-    ├── kiro.ts      # Kiro CLI executor
-    ├── codex.ts     # OpenAI Codex executor
-    └── index.ts     # Factory and exports
+│   ├── menu.ts         # TUI main menu
+│   ├── add-repo.ts     # Interactive repo setup (GitHub/Linear)
+│   ├── list-repos.ts   # List and remove repos
+│   └── executor.ts     # Executor selection
+├── providers/
+│   ├── types.ts        # IssueProvider interface
+│   ├── github.ts       # GitHub Projects provider
+│   ├── linear.ts       # Linear provider
+│   └── index.ts        # Provider factory
+├── executors/
+│   ├── types.ts        # Executor interface
+│   ├── kiro.ts         # Kiro CLI executor
+│   ├── codex.ts        # OpenAI Codex executor
+│   └── index.ts        # Executor factory
+├── ui/
+│   └── dashboard.tsx   # Ink/React real-time dashboard
+└── utils/
+    └── gh.ts           # GitHub CLI wrapper
 ```
 
 ## License
