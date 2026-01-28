@@ -1,3 +1,5 @@
+Hello
+
 # VibeSprint
 
 > **Turn GitHub issues into pull requests automatically** — Just add an issue to your "Ready" column and watch VibeSprint generate, commit, and open a PR for you.
